@@ -1,0 +1,41 @@
+# Dependencies
+/node_modules
+
+# Logs
+/npm-debug.log*
+/yarn-debug.log*
+/yarn-error.log*
+/lerna-debug.log*
+
+# Runtime data
+/pids
+/logs
+/runs
+
+# Environment variables
+.env
+.env*.local
+
+# Production
+/build
+/dist
+/tmp
+
+# Misc
+.DS_Store
+*.seed
+*.log
+*.sql
+*.sqlite
+/coverage
+.nyc_output
+
+# Editor directories and files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS generated files
+.DS_Store
+Thumbs.db

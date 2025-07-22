@@ -1,0 +1,24 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install cron
+RUN apk add --no-cache dcron
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --omit=dev
+
+# Copy source code
+COPY . .
+
+# Copy cron configuration
+COPY crontab /var/spool/cron/crontabs/root
+
+# Make sure cron job is executable
+RUN chmod 0600 /var/spool/cron/crontabs/root
+
+# Start cron daemon and keep container running
+CMD ["crond", "-f"]

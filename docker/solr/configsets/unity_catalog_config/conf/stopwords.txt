@@ -1,0 +1,28 @@
+# Common English stopwords for Unity Catalog search
+# These words are filtered out during indexing and search
+a
+an
+and
+are
+as
+at
+be
+been
+by
+for
+from
+has
+he
+in
+is
+it
+its
+of
+on
+that
+the
+to
+was
+were
+will
+with

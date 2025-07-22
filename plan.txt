@@ -1,0 +1,144 @@
+Software Development Plan: Unity Catalog Search App
+Phase 1: Project Setup & Architecture
+Goals: Establish project structure, tools, and environment for local development.
+
+Tasks:
+ Scaffold a monorepo-style Next.js project (/web)
+
+ Create folders for:
+
+/batch – daily job for catalog indexing
+
+/docker – config, scripts, and volumes
+
+ Create .env.example file for:
+
+DATABRICKS_TOKEN
+
+MYSQL_USER, MYSQL_PASSWORD, MYSQL_DB
+
+ Define Docker Compose services:
+
+web (Next.js frontend/backend)
+
+solr (search engine)
+
+batch (daily catalog updater)
+
+mysql (user prefs DB)
+
+Phase 2: Infrastructure Implementation
+Goals: Build working local stack using Docker Compose.
+
+Tasks:
+ Create Dockerfiles for web and batch services
+
+ Configure persistent volume for Solr core/index
+
+ Set up Solr schema:
+
+Fields: name, type, schema, tags, description, etc.
+
+ Configure MySQL with initial schema:
+
+Users table
+
+Preferences table
+
+ Add cron-like scheduler to batch container (cron, node-cron, etc.)
+
+Phase 3: Backend Development (Next.js API)
+Goals: Implement core backend features.
+
+Tasks:
+ Set up API routes in /pages/api:
+
+GET /api/search?q=... → query Solr
+
+GET /api/preferences → fetch user prefs
+
+POST /api/preferences → update prefs
+
+ Secure API routes with session/auth middleware
+
+ Integrate MySQL using Prisma or another ORM
+
+ Use dotenv for managing secrets in process.env
+
+Phase 4: Authentication
+Goals: Enable user login and session management.
+
+Tasks:
+ Choose auth provider (e.g., NextAuth.js)
+
+ Set up email/password or OAuth (e.g., GitHub/Google)
+
+ Protect preference APIs by user session
+
+ Store session info in MySQL or use JWT
+
+Phase 5: Batch Process Implementation
+Goals: Populate Solr index with Unity Catalog metadata.
+
+Tasks:
+ Connect to Databricks API using token from .env
+
+ Traverse Unity Catalog:
+
+List schemas, tables, files
+
+Fetch tags and metadata
+
+ Format entries for Solr ingestion
+
+ Send docs to Solr (e.g., via Solr JSON API)
+
+ Schedule this job to run daily inside batch container
+
+Phase 6: Frontend Development
+Goals: Build responsive UI for search and user preferences.
+
+Tasks:
+ Design layout using Tailwind CSS or similar
+
+ Implement search interface:
+
+Input + filters
+
+Results list (name, type, schema, tags)
+
+ Implement user preferences page
+
+ Handle auth states and error messages
+
+Phase 7: Integration & Testing
+Goals: Ensure system works as a unit and is developer-friendly.
+
+Tasks:
+ Validate Docker Compose flow from scratch
+
+ Write unit tests for:
+
+API routes
+
+Batch job data parsing
+
+ Write integration tests for:
+
+Search functionality
+
+Login + preference saving
+
+ Add logs for batch job status and errors
+
+Phase 8: Hardening & Developer Experience
+Goals: Improve usability, security, and maintainability.
+
+Tasks:
+ Add .env validation
+
+ Add simple README for local dev
+
+ Use wait-for-it.sh or similar for service startup sync
+
+ Add healthcheck routes to API and Solr

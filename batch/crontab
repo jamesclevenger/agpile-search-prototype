@@ -1,0 +1,4 @@
+# Unity Catalog indexing job - runs daily at 2 AM
+0 2 * * * cd /app && node index.js >> /var/log/cron.log 2>&1
+
+# Keep cron daemon running
