@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import Sidebar from "./components/Sidebar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Fairgrounds - Registry Search",
-  description: "Search the Fairgrounds Registry metadata including catalogs, schemas, tables, columns, volumes, and files",
+  title: "Fairgrounds",
+  description: "Chat with and search Unity Catalog metadata including catalogs, schemas, tables, columns, volumes, and files",
 };
 
 export default function RootLayout({
@@ -27,7 +28,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <div className="flex h-screen">
+          <Sidebar />
+          <main className="flex-1 overflow-hidden">
+            {children}
+          </main>
+        </div>
       </body>
     </html>
   );
