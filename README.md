@@ -1,7 +1,6 @@
 # agpile search prototype
 
-prototype that indexes the contents of a unity catalog to a solr instance & has a web front end to allow for searching
-
+prototype that indexes the contents of a unity catalog to a solr instance & has a web front end to allow for searching; updated to allow for searching via chat with llm
 ## Architecture
 
 - **Web Service**: Next.js application with frontend and API backend
@@ -12,9 +11,9 @@ prototype that indexes the contents of a unity catalog to a solr instance & has 
 ## Quick Start
 1. clone the repository
 2. get or create a databricks API token
-3. create a .env file (see .env.example)
+3. create a .env file (see .env.example); need databricks workspace endpoint and API token, for chat need deployed OpenAI model and 
 4. run `docker compose up`
-5. first time running, manually start the indexer `docker run -it <batch service docker id> node index.js` (the indexer is otherwise scheduled to run at 2am daily)
+5. first time running, manually start the indexer `docker run -it <batch service docker id> node index.js` (otherwise the indexer is otherwise scheduled to run at 2am daily)
 6. navigate to localhost:3000
 7. profit`
 
