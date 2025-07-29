@@ -5,6 +5,34 @@
   --foreground: #171717;
 }
 
+@theme {
+  /* Primary color palette - #84a206 */
+  --color-primary-50: #f4f6f0;
+  --color-primary-100: #e6ebdb;
+  --color-primary-200: #cfd9bb;
+  --color-primary-300: #b3c192;
+  --color-primary-400: #9bad70;
+  --color-primary-500: #84a206;
+  --color-primary-600: #749205;
+  --color-primary-700: #5f7804;
+  --color-primary-800: #4d6103;
+  --color-primary-900: #3e4e03;
+  --color-primary-950: #202a01;
+
+  /* Dark color palette - #182130 */
+  --color-dark-50: #f8f9fa;
+  --color-dark-100: #e9ecf1;
+  --color-dark-200: #d3dae5;
+  --color-dark-300: #b3c0d1;
+  --color-dark-400: #8a9bb5;
+  --color-dark-500: #6b7c9b;
+  --color-dark-600: #566382;
+  --color-dark-700: #47526a;
+  --color-dark-800: #3d4559;
+  --color-dark-900: #353c4c;
+  --color-dark-950: #182130;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

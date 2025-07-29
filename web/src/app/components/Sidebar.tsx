@@ -14,20 +14,16 @@ export default function Sidebar() {
   ];
 
   return (
-    <div className="w-64 bg-gray-900 text-white flex flex-col">
-      <div className="p-6 border-b border-gray-700">
-        <div className="flex items-center gap-3">
+    <div className="w-64 bg-dark-950 text-white flex flex-col">
+      <div className="p-6 border-b bg-white border-dark-800">
+        <div className="flex items-center">
           <Image 
-            src="/fairgrounds_logo.png" 
+            src="/fairgrounds_banner.jpg" 
             alt="Fairgrounds Logo" 
-            width={32} 
-            height={32}
-            className="rounded"
+            width={180} 
+            height={37}
+            className="rounded object-contain"
           />
-          <div>
-            <h1 className="text-lg font-semibold">Fairgrounds</h1>
-            <p className="text-sm text-gray-400">Data</p>
-          </div>
         </div>
       </div>
       
@@ -41,8 +37,8 @@ export default function Sidebar() {
                   href={item.href}
                   className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
                     isActive
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                      ? 'bg-primary-500 text-white'
+                      : 'text-gray-300 hover:bg-dark-800 hover:text-white'
                   }`}
                 >
                   <item.icon className="w-5 h-5" />

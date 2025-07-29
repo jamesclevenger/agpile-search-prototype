@@ -142,7 +142,7 @@ export default function SearchPage() {
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-4">
             <Image 
-              src="/fairgrounds_logo.png" 
+              src="/fairgrounds_logo.jpg" 
               alt="Fairgrounds Logo" 
               width={32} 
               height={32}
@@ -165,7 +165,7 @@ export default function SearchPage() {
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Search catalogs, tables, files..."
-                    className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                   {query && (
                     <button
@@ -182,7 +182,7 @@ export default function SearchPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-50"
               >
                 {loading ? 'Searching...' : 'Search'}
               </button>
@@ -299,7 +299,7 @@ export default function SearchPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-medium text-gray-900">{result.name}</h3>
-                        <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                        <span className="px-2 py-1 text-xs bg-primary-100 text-primary-800 rounded-full">
                           {result.type}
                         </span>
                       </div>
@@ -340,7 +340,7 @@ export default function SearchPage() {
                         onClick={() => searchCatalog(query, filters, i)}
                         className={`px-3 py-1 rounded ${
                           i === results.page
-                            ? 'bg-blue-600 text-white'
+                            ? 'bg-primary-500 text-white'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                         }`}
                       >

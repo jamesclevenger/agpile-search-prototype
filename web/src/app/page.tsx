@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { SendIcon, MessageCircleIcon, Trash2Icon } from 'lucide-react';
+import { SendIcon, MessageCircleIcon } from 'lucide-react';
 import Image from 'next/image';
 import { useChat } from '@/hooks/useChat';
 
 export default function ChatPage() {
   const [input, setInput] = useState('');
-  const { messages, loading, sendMessage, clearMessages } = useChat();
+  const { messages, loading, sendMessage } = useChat();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,25 +25,11 @@ export default function ChatPage() {
     <div className="flex flex-col h-full bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <MessageCircleIcon className="w-6 h-6 text-blue-600" />
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900">Fairgrounds Information Booth</h1>
-              <p className="text-sm text-gray-600">Ask questions about Fairgrounds Data</p>
-            </div>
-          </div>
-          {messages.length > 0 && (
-            <button
-              onClick={clearMessages}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Clear chat history"
-            >
-              <Trash2Icon className="w-4 h-4" />
-              Clear History
-            </button>
-          )}
+        <div className="flex items-center gap-3">
+          <MessageCircleIcon className="w-6 h-6 text-primary-500" />
+          <h1 className="text-xl font-semibold text-gray-900">Fairgrounds Information Desk</h1>
         </div>
+        <p className="text-sm text-gray-600 mt-1">Ask questions about Fairgrounds Data</p>
       </div>
 
       {/* Messages */}
@@ -51,10 +37,10 @@ export default function ChatPage() {
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <Image 
-              src="/fairgrounds_logo.png" 
+              src="/fairgrounds_logo.jpg" 
               alt="Fairgrounds Logo" 
-              width={64} 
-              height={64}
+              width={54} 
+              height={65}
               className="rounded-lg mb-4"
             />
             <h2 className="text-xl font-medium text-gray-600 mb-2">Welcome to Fairgrounds</h2>
@@ -73,14 +59,14 @@ export default function ChatPage() {
                 <div
                   className={`max-w-xs lg:max-w-2xl px-4 py-2 rounded-lg ${
                     message.type === 'user'
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-primary-500 text-white'
                       : 'bg-white border border-gray-200 text-gray-900'
                   }`}
                 >
                   <p className="text-sm">{message.content}</p>
                   <p
                     className={`text-xs mt-1 ${
-                      message.type === 'user' ? 'text-blue-100' : 'text-gray-500'
+                      message.type === 'user' ? 'text-primary-100' : 'text-gray-500'
                     }`}
                   >
                     {formatTime(message.timestamp)}
@@ -116,14 +102,14 @@ export default function ChatPage() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Ask about your data..."
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 disabled={loading}
               />
             </div>
             <button
               type="submit"
               disabled={!input.trim() || loading}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-6 py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               <SendIcon className="w-4 h-4" />
               Send
