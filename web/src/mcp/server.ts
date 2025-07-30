@@ -7,10 +7,22 @@ import {
   handleListCatalogs
 } from './tools/solr-search';
 
+import {
+  searchGermplasmByNameTool,
+  getGermplasmDetailsTool,
+  testBrAPIConnectionTool,
+  handleSearchGermplasmByName,
+  handleGetGermplasmDetails,
+  handleTestBrAPIConnection
+} from './tools/brapi-germplasm';
+
 export const MCP_TOOLS = [
   searchCatalogTool,
   getTableDetailsTool,
-  listCatalogsTool
+  listCatalogsTool,
+  searchGermplasmByNameTool,
+  getGermplasmDetailsTool,
+  testBrAPIConnectionTool
 ];
 
 export async function executeMCPTool(toolName: string, args: unknown): Promise<string> {
@@ -21,6 +33,12 @@ export async function executeMCPTool(toolName: string, args: unknown): Promise<s
       return await handleGetTableDetails(args);
     case 'list_catalogs':
       return await handleListCatalogs(args);
+    case 'search_germplasm_by_name':
+      return await handleSearchGermplasmByName(args);
+    case 'get_germplasm_details':
+      return await handleGetGermplasmDetails(args);
+    case 'test_brapi_connection':
+      return await handleTestBrAPIConnection(args);
     default:
       throw new Error(`Unknown tool: ${toolName}`);
   }

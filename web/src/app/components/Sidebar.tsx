@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { SearchIcon, MessageCircleIcon } from 'lucide-react';
+import { SearchIcon, MessageCircleIcon, SettingsIcon } from 'lucide-react';
 import Image from 'next/image';
 
 export default function Sidebar() {
@@ -11,6 +11,7 @@ export default function Sidebar() {
   const navigation = [
     { name: 'Information Booth', href: '/', icon: MessageCircleIcon },
     { name: 'Search', href: '/search', icon: SearchIcon },
+    { name: 'Settings', href: '/settings', icon: SettingsIcon },
   ];
 
   return (

@@ -1,0 +1,228 @@
+name: Deploy to Azure Container Instances
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  AZURE_RESOURCE_GROUP: rg-unity-catalog-search
+  ACR_NAME: acrunitycatalog
+  WEB_IMAGE_NAME: unity-catalog-web
+  BATCH_IMAGE_NAME: unity-catalog-batch
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      web-image: ${{ steps.build-web.outputs.image }}
+      batch-image: ${{ steps.build-batch.outputs.image }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Azure Container Registry
+      uses: azure/docker-login@v1
+      with:
+        login-server: ${{ secrets.ACR_LOGIN_SERVER }}
+        username: ${{ secrets.ACR_USERNAME }}
+        password: ${{ secrets.ACR_PASSWORD }}
+
+    - name: Extract metadata for Web image
+      id: meta-web
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.WEB_IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Extract metadata for Batch image
+      id: meta-batch
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.BATCH_IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Web image
+      id: build-web
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./docker/Dockerfile.web.prod
+        push: true
+        tags: ${{ steps.meta-web.outputs.tags }}
+        labels: ${{ steps.meta-web.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Build and push Batch image
+      id: build-batch
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./docker/Dockerfile.batch.prod
+        push: true
+        tags: ${{ steps.meta-batch.outputs.tags }}
+        labels: ${{ steps.meta-batch.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  deploy-dev:
+    if: github.ref == 'refs/heads/develop'
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: development
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Deploy Azure Infrastructure (Dev)
+      run: |
+        cd azure
+        terraform init
+        terraform workspace select dev || terraform workspace new dev
+        terraform plan -var-file="environments/dev.tfvars" -out=tfplan
+        terraform apply tfplan
+      env:
+        TF_VAR_mysql_admin_password: ${{ secrets.MYSQL_ADMIN_PASSWORD }}
+        TF_VAR_databricks_token: ${{ secrets.DATABRICKS_TOKEN }}
+        TF_VAR_databricks_workspace_url: ${{ secrets.DATABRICKS_WORKSPACE_URL }}
+
+    - name: Update Container Instances (Dev)
+      run: |
+        # Update Web Container
+        az container restart \
+          --resource-group ${{ env.AZURE_RESOURCE_GROUP }}-dev \
+          --name aci-unity-web-dev
+
+        # Update Batch Container
+        az container restart \
+          --resource-group ${{ env.AZURE_RESOURCE_GROUP }}-dev \
+          --name aci-unity-batch-dev
+
+  deploy-staging:
+    if: github.ref == 'refs/heads/main'
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: staging
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Deploy Azure Infrastructure (Staging)
+      run: |
+        cd azure
+        terraform init
+        terraform workspace select staging || terraform workspace new staging
+        terraform plan -var-file="environments/staging.tfvars" -out=tfplan
+        terraform apply tfplan
+      env:
+        TF_VAR_mysql_admin_password: ${{ secrets.MYSQL_ADMIN_PASSWORD }}
+        TF_VAR_databricks_token: ${{ secrets.DATABRICKS_TOKEN }}
+        TF_VAR_databricks_workspace_url: ${{ secrets.DATABRICKS_WORKSPACE_URL }}
+
+    - name: Update Container Instances (Staging)
+      run: |
+        # Update Web Container
+        az container restart \
+          --resource-group ${{ env.AZURE_RESOURCE_GROUP }}-staging \
+          --name aci-unity-web-staging
+
+        # Update Batch Container
+        az container restart \
+          --resource-group ${{ env.AZURE_RESOURCE_GROUP }}-staging \
+          --name aci-unity-batch-staging
+
+  deploy-production:
+    if: github.ref == 'refs/heads/main'
+    needs: [build-and-push, deploy-staging]
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Deploy Azure Infrastructure (Production)
+      run: |
+        cd azure
+        terraform init
+        terraform workspace select prod || terraform workspace new prod
+        terraform plan -var-file="environments/prod.tfvars" -out=tfplan
+        terraform apply tfplan
+      env:
+        TF_VAR_mysql_admin_password: ${{ secrets.MYSQL_ADMIN_PASSWORD }}
+        TF_VAR_databricks_token: ${{ secrets.DATABRICKS_TOKEN }}
+        TF_VAR_databricks_workspace_url: ${{ secrets.DATABRICKS_WORKSPACE_URL }}
+
+    - name: Update Container Instances (Production)
+      run: |
+        # Update Web Container
+        az container restart \
+          --resource-group ${{ env.AZURE_RESOURCE_GROUP }}-prod \
+          --name aci-unity-web-prod
+
+        # Update Batch Container
+        az container restart \
+          --resource-group ${{ env.AZURE_RESOURCE_GROUP }}-prod \
+          --name aci-unity-batch-prod
+
+    - name: Run Health Checks
+      run: |
+        # Wait for containers to start
+        sleep 60
+        
+        # Check web service health
+        WEB_URL=$(az container show \
+          --resource-group ${{ env.AZURE_RESOURCE_GROUP }}-prod \
+          --name aci-unity-web-prod \
+          --query "ipAddress.fqdn" \
+          --output tsv)
+        
+        curl -f "https://${WEB_URL}:3000/api/health" || exit 1
+        echo "Production deployment successful!"
+
+  cleanup:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Cleanup PR Resources
+      run: |
+        # Clean up any PR-specific resources if they exist
+        PR_NUMBER=${{ github.event.number }}
+        echo "Cleaning up resources for PR #${PR_NUMBER}"

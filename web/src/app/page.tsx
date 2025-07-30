@@ -1,13 +1,16 @@
 'use client';
 
-import { useState } from 'react';
-import { SendIcon, MessageCircleIcon } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { SendIcon, MessageCircleIcon, TrashIcon } from 'lucide-react';
 import Image from 'next/image';
-import { useChat } from '@/hooks/useChat';
+import { useChatContext } from '@/contexts/ChatContext';
+import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 
 export default function ChatPage() {
   const [input, setInput] = useState('');
-  const { messages, loading, sendMessage } = useChat();
+  const { messages, loading, sendMessage, clearMessages } = useChatContext();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastAssistantMessageRef = useRef<HTMLDivElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,15 +24,45 @@ export default function ChatPage() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Auto-scroll to new assistant messages
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage && lastMessage.type === 'assistant' && !loading) {
+      // Scroll to the start of the last assistant message after a brief delay
+      setTimeout(() => {
+        if (lastAssistantMessageRef.current) {
+          lastAssistantMessageRef.current.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          });
+        }
+      }, 100);
+    }
+  }, [messages, loading]);
+
   return (
     <div className="flex flex-col h-full bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center gap-3">
-          <MessageCircleIcon className="w-6 h-6 text-primary-500" />
-          <h1 className="text-xl font-semibold text-gray-900">Fairgrounds Information Desk</h1>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <MessageCircleIcon className="w-6 h-6 text-primary-500" />
+            <div>
+              <h1 className="text-xl font-semibold text-gray-900">Fairgrounds Information Booth</h1>
+              <p className="text-sm text-gray-600 mt-1">Ask questions about Fairgrounds Data</p>
+            </div>
+          </div>
+          {messages.length > 0 && (
+            <button
+              onClick={clearMessages}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              title="Clear chat history"
+            >
+              <TrashIcon className="w-4 h-4" />
+              Clear History
+            </button>
+          )}
         </div>
-        <p className="text-sm text-gray-600 mt-1">Ask questions about Fairgrounds Data</p>
       </div>
 
       {/* Messages */}
@@ -51,29 +84,37 @@ export default function ChatPage() {
           </div>
         ) : (
           <div className="space-y-6 max-w-4xl mx-auto">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
+            {messages.map((message, index) => {
+              const isLastAssistantMessage = message.type === 'assistant' && index === messages.length - 1;
+              return (
                 <div
-                  className={`max-w-xs lg:max-w-2xl px-4 py-2 rounded-lg ${
-                    message.type === 'user'
-                      ? 'bg-primary-500 text-white'
-                      : 'bg-white border border-gray-200 text-gray-900'
-                  }`}
+                  key={message.id}
+                  ref={isLastAssistantMessage ? lastAssistantMessageRef : null}
+                  className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <p className="text-sm">{message.content}</p>
-                  <p
-                    className={`text-xs mt-1 ${
-                      message.type === 'user' ? 'text-primary-100' : 'text-gray-500'
+                  <div
+                    className={`max-w-xs lg:max-w-2xl px-4 py-2 rounded-lg ${
+                      message.type === 'user'
+                        ? 'bg-primary-500 text-white'
+                        : 'bg-white border border-gray-200 text-gray-900'
                     }`}
                   >
-                    {formatTime(message.timestamp)}
-                  </p>
+                    {message.type === 'assistant' ? (
+                      <MarkdownRenderer content={message.content} />
+                    ) : (
+                      <p className="text-sm">{message.content}</p>
+                    )}
+                    <p
+                      className={`text-xs mt-1 ${
+                        message.type === 'user' ? 'text-primary-100' : 'text-gray-500'
+                      }`}
+                    >
+                      {formatTime(message.timestamp)}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {loading && (
               <div className="flex justify-start">
                 <div className="bg-white border border-gray-200 rounded-lg px-4 py-2">
@@ -88,6 +129,7 @@ export default function ChatPage() {
                 </div>
               </div>
             )}
+            <div ref={messagesEndRef} />
           </div>
         )}
       </div>
