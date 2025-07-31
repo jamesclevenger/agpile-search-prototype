@@ -138,7 +138,7 @@ resource "azurerm_container_group" "web" {
 
   container {
     name   = "web"
-    image  = "${azurerm_container_registry.acr.login_server}/unity-catalog-web:latest"
+    image  = "nginx:alpine"  # Placeholder image - will be updated by GitHub Actions
     cpu    = "1"
     memory = "2"
 
@@ -208,7 +208,7 @@ resource "azurerm_container_group" "solr" {
       share_name          = azurerm_storage_share.solr.name
     }
 
-    commands = ["bash", "-c", "solr-precreate unity_catalog /opt/solr/server/solr/configsets/unity_catalog_config && solr-foreground"]
+    commands = ["bash", "-c", "solr-precreate unity_catalog && solr-foreground"]
   }
 
   tags = {
@@ -228,7 +228,7 @@ resource "azurerm_container_group" "batch" {
 
   container {
     name   = "batch"
-    image  = "${azurerm_container_registry.acr.login_server}/unity-catalog-batch:latest"
+    image  = "alpine:latest"  # Placeholder image - will be updated by GitHub Actions
     cpu    = "0.5"
     memory = "1"
 
