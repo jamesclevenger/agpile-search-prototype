@@ -335,6 +335,29 @@ resource "random_string" "nextauth_secret" {
   special = true
 }
 
+# Import images into ACR
+resource "azurerm_container_registry_import" "mysql" {
+  name                = azurerm_container_registry.acr.name
+  resource_group_name = azurerm_resource_group.main.name
+  source {
+    source_image = "mysql:8.0"
+    registry_uri = "docker.io"
+  }
+  target_tags = ["mysql:8.0"]
+  mode        = "Force" # Overwrite existing tags
+}
+
+resource "azurerm_container_registry_import" "solr" {
+  name                = azurerm_container_registry.acr.name
+  resource_group_name = azurerm_resource_group.main.name
+  source {
+    source_image = "solr:9.6"
+    registry_uri = "docker.io"
+  }
+  target_tags = ["solr:9.6"]
+  mode        = "Force" # Overwrite existing tags
+}
+
 # Outputs
 output "resource_group_name" {
   value = azurerm_resource_group.main.name
