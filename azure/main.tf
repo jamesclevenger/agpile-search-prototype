@@ -225,7 +225,7 @@ resource "azurerm_container_group" "solr" {
 
   container {
     name   = "solr"
-    image  = "ghcr.io/library/solr:9.6"
+    image  = "solr:9.6"
     cpu    = "1"
     memory = "2"
 
