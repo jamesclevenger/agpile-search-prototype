@@ -10,9 +10,15 @@ export async function GET() {
       user: process.env.MYSQL_USER,
       password: process.env.MYSQL_PASSWORD,
       database: process.env.MYSQL_DB,
+      connectTimeout: 10000,  // 10 second timeout
+      acquireTimeout: 10000,
     });
 
     await connection.ping();
+    
+    // Test basic query to ensure database is properly initialized
+    const [rows] = await connection.execute('SELECT 1 as test');
+    
     await connection.end();
 
     // Check Solr connectivity

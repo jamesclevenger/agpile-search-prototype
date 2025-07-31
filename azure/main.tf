@@ -64,23 +64,13 @@ resource "azurerm_container_registry" "acr" {
   }
 }
 
-# MySQL Flexible Server
-resource "azurerm_mysql_flexible_server" "mysql" {
-  name                   = "mysql-unity-catalog-${var.environment}"
-  resource_group_name    = azurerm_resource_group.main.name
-  location              = azurerm_resource_group.main.location
-  administrator_login    = "unityadmin"
-  administrator_password = var.mysql_admin_password
-  backup_retention_days  = 7
-  sku_name              = "B_Standard_B1s"
-  version               = "8.0.21"
-
-  storage {
-    size_gb = 20
-  }
-
-  # Specify availability zone to avoid region issues
-  zone = "1"
+# Storage Account for MySQL data persistence
+resource "azurerm_storage_account" "mysql" {
+  name                     = "mysql${var.environment}${random_string.suffix.result}"
+  resource_group_name      = azurerm_resource_group.main.name
+  location                = azurerm_resource_group.main.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
 
   tags = {
     Environment = var.environment
@@ -88,22 +78,57 @@ resource "azurerm_mysql_flexible_server" "mysql" {
   }
 }
 
-# MySQL Database
-resource "azurerm_mysql_flexible_database" "database" {
-  name                = "unity_catalog"
-  resource_group_name = azurerm_resource_group.main.name
-  server_name         = azurerm_mysql_flexible_server.mysql.name
-  charset             = "utf8"
-  collation          = "utf8_unicode_ci"
+# File Share for MySQL data
+resource "azurerm_storage_share" "mysql" {
+  name                 = "mysql-data"
+  storage_account_name = azurerm_storage_account.mysql.name
+  quota                = 10
 }
 
-# MySQL Firewall Rule (Allow Azure Services)
-resource "azurerm_mysql_flexible_server_firewall_rule" "azure" {
-  name             = "AllowAzureServices"
+# Container Group for MySQL Service
+resource "azurerm_container_group" "mysql" {
+  name                = "aci-unity-mysql-${var.environment}"
+  location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
-  server_name      = azurerm_mysql_flexible_server.mysql.name
-  start_ip_address = "0.0.0.0"
-  end_ip_address   = "0.0.0.0"
+  ip_address_type     = "Public"
+  dns_name_label      = "unity-catalog-mysql-${var.environment}"
+  os_type             = "Linux"
+
+  container {
+    name   = "mysql"
+    image  = "mysql:8.0"
+    cpu    = "1"
+    memory = "2"
+
+    ports {
+      port     = 3306
+      protocol = "TCP"
+    }
+
+    environment_variables = {
+      MYSQL_ROOT_PASSWORD = var.mysql_admin_password
+      MYSQL_DATABASE      = "unity_catalog"
+      MYSQL_USER          = "unityadmin"
+      MYSQL_PASSWORD      = var.mysql_admin_password
+      # Skip MySQL's built-in DNS resolution to speed up startup
+      MYSQL_SKIP_NAME_RESOLVE = "1"
+      # Initialize database faster
+      MYSQL_INIT_CONNECT = "SET sql_mode='STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO'"
+    }
+
+    volume {
+      name                 = "mysql-data"
+      mount_path          = "/var/lib/mysql"
+      storage_account_name = azurerm_storage_account.mysql.name
+      storage_account_key  = azurerm_storage_account.mysql.primary_access_key
+      share_name          = azurerm_storage_share.mysql.name
+    }
+  }
+
+  tags = {
+    Environment = var.environment
+    Project     = "unity-catalog-search"
+  }
 }
 
 # Storage Account for Solr data
@@ -155,10 +180,10 @@ resource "azurerm_container_group" "web" {
     }
 
     environment_variables = {
-      MYSQL_HOST     = azurerm_mysql_flexible_server.mysql.fqdn
+      MYSQL_HOST     = azurerm_container_group.mysql.fqdn
       MYSQL_PORT     = "3306"
-      MYSQL_USER     = azurerm_mysql_flexible_server.mysql.administrator_login
-      MYSQL_DB       = azurerm_mysql_flexible_database.database.name
+      MYSQL_USER     = "unityadmin"
+      MYSQL_DB       = "unity_catalog"
       SOLR_HOST      = azurerm_container_group.solr.fqdn
       SOLR_PORT      = "8983"
       SOLR_CORE      = "unity_catalog"
@@ -176,6 +201,12 @@ resource "azurerm_container_group" "web" {
     username = azurerm_container_registry.acr.admin_username
     password = azurerm_container_registry.acr.admin_password
   }
+
+  # Ensure web container starts after MySQL and Solr are ready
+  depends_on = [
+    azurerm_container_group.mysql,
+    azurerm_container_group.solr
+  ]
 
   tags = {
     Environment = var.environment
@@ -240,10 +271,10 @@ resource "azurerm_container_group" "batch" {
     memory = "1"
 
     environment_variables = {
-      MYSQL_HOST      = azurerm_mysql_flexible_server.mysql.fqdn
+      MYSQL_HOST      = azurerm_container_group.mysql.fqdn
       MYSQL_PORT      = "3306"
-      MYSQL_USER      = azurerm_mysql_flexible_server.mysql.administrator_login
-      MYSQL_DB        = azurerm_mysql_flexible_database.database.name
+      MYSQL_USER      = "unityadmin"
+      MYSQL_DB        = "unity_catalog"
       SOLR_HOST       = azurerm_container_group.solr.fqdn
       SOLR_PORT       = "8983"
       SOLR_CORE       = "unity_catalog"
@@ -261,6 +292,12 @@ resource "azurerm_container_group" "batch" {
     username = azurerm_container_registry.acr.admin_username
     password = azurerm_container_registry.acr.admin_password
   }
+
+  # Ensure batch container starts after MySQL and Solr are ready
+  depends_on = [
+    azurerm_container_group.mysql,
+    azurerm_container_group.solr
+  ]
 
   tags = {
     Environment = var.environment
@@ -321,5 +358,5 @@ output "web_app_url" {
 }
 
 output "mysql_server_fqdn" {
-  value = azurerm_mysql_flexible_server.mysql.fqdn
+  value = azurerm_container_group.mysql.fqdn
 }

@@ -187,6 +187,8 @@ jobs:
           --name "aci-unity-batch-${ENV}" \
           --yes || echo "Batch container group not found or already deleted"
         
+        # Note: MySQL container is NOT deleted to preserve data and avoid downtime
+        
         echo "Waiting for deletions to complete..."
         sleep 30
         
@@ -197,7 +199,15 @@ jobs:
         export TF_VAR_web_image="${ACR_NAME}.azurecr.io/unity-catalog-web:latest"
         export TF_VAR_batch_image="${ACR_NAME}.azurecr.io/unity-catalog-batch:latest"
         
-        terraform apply -auto-approve -target=azurerm_container_group.web -target=azurerm_container_group.batch
+        # Apply all container groups (MySQL will be created on first run, updated on subsequent runs)
+        terraform apply -auto-approve \
+          -target=azurerm_container_group.mysql \
+          -target=azurerm_container_group.web \
+          -target=azurerm_container_group.batch \
+          -target=azurerm_container_group.solr
+        
+        echo "Waiting for containers to start and initialize..."
+        sleep 90  # Give MySQL extra time to initialize database
       env:
         # Service Principal authentication for Terraform
         ARM_CLIENT_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).clientId }}
@@ -214,8 +224,8 @@ jobs:
         ENV="${{ needs.deploy-infrastructure.outputs.environment }}"
         RG_NAME="${{ env.AZURE_RESOURCE_GROUP }}-${ENV}"
         
-        # Wait for containers to start
-        sleep 60
+        # Wait for containers to start (reduced since we already waited 90s above)
+        sleep 30
         
         # Check web service health
         WEB_URL=$(az container show \
