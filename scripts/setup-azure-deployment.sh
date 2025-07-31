@@ -43,8 +43,8 @@ read -p "Azure Subscription ID: " SUBSCRIPTION_ID
 read -p "Resource Group Name (default: rg-unity-catalog-search): " RESOURCE_GROUP
 RESOURCE_GROUP=${RESOURCE_GROUP:-rg-unity-catalog-search}
 
-read -p "Azure Region (default: East US 2): " LOCATION
-LOCATION=${LOCATION:-"East US 2"}
+read -p "Azure Region (default: West US 2): " LOCATION
+LOCATION=${LOCATION:-"West US 2"}
 
 read -s -p "MySQL Admin Password: " MYSQL_PASSWORD
 echo ""

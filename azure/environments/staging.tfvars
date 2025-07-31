@@ -1,6 +1,6 @@
 # Staging Environment Configuration
 resource_group_name = "rg-unity-catalog-search"
-location           = "East US 2"
+location           = "West US 2"
 environment        = "staging"
 
 # Staging-specific settings (these will be set via GitHub Secrets)
