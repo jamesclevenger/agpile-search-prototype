@@ -1,7 +1,7 @@
 terraform {
   backend "azurerm" {
-    resource_group_name  = "rg-fairgrounds-search"
-    storage_account_name = "tfstate1753912433"
+    resource_group_name  = "rg-unity-catalog-search"
+    storage_account_name = "tf1753924138"
     container_name       = "tfstate"
     key                  = "terraform.tfstate"
   }

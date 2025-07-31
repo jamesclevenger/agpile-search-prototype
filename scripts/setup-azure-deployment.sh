@@ -89,28 +89,45 @@ echo -e "${GREEN}✓ GitHub secrets configured${NC}"
 
 # Initialize Terraform
 echo -e "${YELLOW}Initializing Terraform...${NC}"
-cd ../azure
-terraform init
+cd "$(dirname "$0")/../azure"
+
+# Clean up any existing Terraform state
+echo -e "${YELLOW}Cleaning up existing Terraform state...${NC}"
+rm -rf .terraform
+rm -f terraform.tfstate*
 
 # Create Terraform backend configuration
 echo -e "${YELLOW}Setting up Terraform backend...${NC}"
-STORAGE_ACCOUNT_NAME="tfstate$(date +%s)"
-az storage account create \
+STORAGE_ACCOUNT_NAME="tf$(date +%s)"
+if ! az storage account create \
   --resource-group "$RESOURCE_GROUP" \
   --name "$STORAGE_ACCOUNT_NAME" \
   --sku Standard_LRS \
-  --encryption-services blob
+  --encryption-services blob; then
+  echo -e "${RED}Error: Failed to create storage account${NC}"
+  exit 1
+fi
 
+echo "Getting storage account key..."
 ACCOUNT_KEY=$(az storage account keys list \
   --resource-group "$RESOURCE_GROUP" \
   --account-name "$STORAGE_ACCOUNT_NAME" \
   --query '[0].value' \
   --output tsv)
 
-az storage container create \
+if [[ -z "$ACCOUNT_KEY" ]]; then
+  echo -e "${RED}Error: Failed to get storage account key${NC}"
+  exit 1
+fi
+
+echo "Creating storage container..."
+if ! az storage container create \
   --name tfstate \
   --account-name "$STORAGE_ACCOUNT_NAME" \
-  --account-key "$ACCOUNT_KEY"
+  --account-key "$ACCOUNT_KEY"; then
+  echo -e "${RED}Error: Failed to create storage container${NC}"
+  exit 1
+fi
 
 # Create backend configuration
 cat > backend.tf << EOF
@@ -124,6 +141,8 @@ terraform {
 }
 EOF
 
+# Initialize Terraform with new backend
+echo -e "${YELLOW}Initializing Terraform with new backend...${NC}"
 terraform init -force-copy
 
 echo ""
