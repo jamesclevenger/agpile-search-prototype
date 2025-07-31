@@ -96,7 +96,7 @@ resource "azurerm_container_group" "mysql" {
 
   container {
     name   = "mysql"
-    image  = "mysql:8.0"
+    image  = "ghcr.io/library/mysql:8.0"
     cpu    = "1"
     memory = "2"
 
@@ -225,7 +225,7 @@ resource "azurerm_container_group" "solr" {
 
   container {
     name   = "solr"
-    image  = "solr:9.6"
+    image  = "ghcr.io/library/solr:9.6"
     cpu    = "1"
     memory = "2"
 
