@@ -72,8 +72,8 @@ resource "azurerm_mysql_flexible_server" "mysql" {
   administrator_login    = "unityadmin"
   administrator_password = var.mysql_admin_password
   backup_retention_days  = 7
-  sku_name              = "B_Standard_B2s"
-  version               = "8.0.21"
+  sku_name              = "Standard_B1ms"
+  version               = "8.0"
 
   storage {
     size_gb = 20
