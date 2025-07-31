@@ -9,6 +9,10 @@ terraform {
 
 provider "azurerm" {
   features {}
+  
+  # Use Service Principal authentication (configured via environment variables)
+  # ARM_CLIENT_ID, ARM_CLIENT_SECRET, ARM_SUBSCRIPTION_ID, ARM_TENANT_ID
+  use_cli = false
 }
 
 variable "resource_group_name" {
@@ -138,7 +142,7 @@ resource "azurerm_container_group" "web" {
 
   container {
     name   = "web"
-    image  = "nginx:alpine"  # Placeholder image - will be updated by GitHub Actions
+    image  = var.web_image
     cpu    = "1"
     memory = "2"
 
@@ -228,7 +232,7 @@ resource "azurerm_container_group" "batch" {
 
   container {
     name   = "batch"
-    image  = "alpine:latest"  # Placeholder image - will be updated by GitHub Actions
+    image  = var.batch_image
     cpu    = "0.5"
     memory = "1"
 
@@ -271,6 +275,18 @@ variable "databricks_token" {
 variable "databricks_workspace_url" {
   description = "Databricks workspace URL"
   type        = string
+}
+
+variable "web_image" {
+  description = "Web container image"
+  type        = string
+  default     = "nginx:alpine"
+}
+
+variable "batch_image" {
+  description = "Batch container image"  
+  type        = string
+  default     = "alpine:latest"
 }
 
 # Random secret for NextAuth

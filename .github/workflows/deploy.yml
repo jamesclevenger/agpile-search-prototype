@@ -3,8 +3,7 @@ name: Deploy to Azure Container Instances
 on:
   push:
     branches: [main, develop]
-  pull_request:
-    branches: [main]
+  # Remove pull_request trigger to avoid unnecessary deployments
 
 env:
   AZURE_RESOURCE_GROUP: rg-unity-catalog-search
@@ -54,6 +53,12 @@ jobs:
         terraform plan -var-file="environments/${{ steps.set-env.outputs.environment }}.tfvars" -out=tfplan
         terraform apply -auto-approve tfplan
       env:
+        # Service Principal authentication for Terraform
+        ARM_CLIENT_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).clientId }}
+        ARM_CLIENT_SECRET: ${{ fromJson(secrets.AZURE_CREDENTIALS).clientSecret }}
+        ARM_SUBSCRIPTION_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}
+        ARM_TENANT_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).tenantId }}
+        # Application variables
         TF_VAR_mysql_admin_password: ${{ secrets.MYSQL_ADMIN_PASSWORD }}
         TF_VAR_databricks_token: ${{ secrets.DATABRICKS_TOKEN }}
         TF_VAR_databricks_workspace_url: ${{ secrets.DATABRICKS_WORKSPACE_URL }}
@@ -75,6 +80,12 @@ jobs:
           echo "ACR not ready yet, waiting 30 seconds..."
           sleep 30
         done
+      env:
+        # Service Principal authentication for Terraform                                                                                                                          │ │
+        ARM_CLIENT_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).clientId }}                                                                                                        │ │
+        ARM_CLIENT_SECRET: ${{ fromJson(secrets.AZURE_CREDENTIALS).clientSecret }}                                                                                                │ │
+        ARM_SUBSCRIPTION_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}                                                                                            │ │
+        ARM_TENANT_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).tenantId }}  
 
   build-and-push:
     needs: deploy-infrastructure
@@ -148,6 +159,9 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
     - name: Azure Login
       uses: azure/login@v1
       with:
@@ -159,24 +173,41 @@ jobs:
         RG_NAME="${{ env.AZURE_RESOURCE_GROUP }}-${ENV}"
         ACR_NAME="${{ env.ACR_NAME }}${ENV}"
         
-        # Update Web Container with new image
-        az container exec \
+        echo "Deleting existing container groups to force image update..."
+        
+        # Delete Web Container Group
+        az container delete \
           --resource-group "$RG_NAME" \
           --name "aci-unity-web-${ENV}" \
-          --container-name web \
-          --exec-command "echo 'Stopping placeholder container'" || true
+          --yes || echo "Web container group not found or already deleted"
         
-        # Force update by deleting and recreating container group
-        echo "Updating container images..."
-        az deployment group create \
+        # Delete Batch Container Group  
+        az container delete \
           --resource-group "$RG_NAME" \
-          --template-file azure/container-update.json \
-          --parameters \
-            webImage="${ACR_NAME}.azurecr.io/unity-catalog-web:latest" \
-            batchImage="${ACR_NAME}.azurecr.io/unity-catalog-batch:latest" \
-            environment="$ENV" \
-          --mode Incremental \
-          --wait
+          --name "aci-unity-batch-${ENV}" \
+          --yes || echo "Batch container group not found or already deleted"
+        
+        echo "Waiting for deletions to complete..."
+        sleep 30
+        
+        echo "Re-running Terraform to recreate containers with updated images..."
+        cd azure
+        
+        # Update Terraform variables to use actual images
+        export TF_VAR_web_image="${ACR_NAME}.azurecr.io/unity-catalog-web:latest"
+        export TF_VAR_batch_image="${ACR_NAME}.azurecr.io/unity-catalog-batch:latest"
+        
+        terraform apply -auto-approve -target=azurerm_container_group.web -target=azurerm_container_group.batch
+      env:
+        # Service Principal authentication for Terraform
+        ARM_CLIENT_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).clientId }}
+        ARM_CLIENT_SECRET: ${{ fromJson(secrets.AZURE_CREDENTIALS).clientSecret }}
+        ARM_SUBSCRIPTION_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}
+        ARM_TENANT_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).tenantId }}
+        # Application variables
+        TF_VAR_mysql_admin_password: ${{ secrets.MYSQL_ADMIN_PASSWORD }}
+        TF_VAR_databricks_token: ${{ secrets.DATABRICKS_TOKEN }}
+        TF_VAR_databricks_workspace_url: ${{ secrets.DATABRICKS_WORKSPACE_URL }}
 
     - name: Run Health Checks
       run: |
@@ -201,18 +232,3 @@ jobs:
           exit 1
         fi
 
-  cleanup:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Azure Login
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-    - name: Cleanup PR Resources
-      run: |
-        # Clean up any PR-specific resources if they exist
-        PR_NUMBER=${{ github.event.number }}
-        echo "Cleaning up resources for PR #${PR_NUMBER}"
