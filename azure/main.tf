@@ -353,7 +353,7 @@ variable "databricks_token" {
   sensitive   = true
 }
 
-variable "databricks_workspace__url" {
+variable "databricks_workspace_url" {
   description = "Databricks workspace URL"
   type        = string
 }
