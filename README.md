@@ -1,7 +1,7 @@
 # agpile search prototype
 
 prototype that indexes the contents of a unity catalog to a solr instance & has a web front end to allow for searching; updated to allow for searching via chat with llm
-## Architecture
+## Architecture; updated to demonstrate BrAPI interaction through chat
 
 - **Web Service**: Next.js application with frontend and API backend
 - **Solr**: Apache Solr for full-text search capabilities
