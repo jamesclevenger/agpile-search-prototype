@@ -1,6 +1,6 @@
 # Development Environment Configuration
 resource_group_name = "rg-unity-catalog-search"
-location           = "East US"
+location           = "East US 2"
 environment        = "dev"
 
 # Development-specific settings (these will be set via GitHub Secrets)

@@ -259,7 +259,7 @@ docker pull acrunitycatalogprod.azurecr.io/unity-catalog-web:latest
 3. **Verify Health**
    ```bash
    # Check health endpoint
-   curl -f https://unity-catalog-web-prod.eastus.azurecontainer.io:3000/api/health
+   curl -f https://unity-catalog-web-prod.eastus2.azurecontainer.io:3000/api/health
    ```
 
 ## Cost Optimization

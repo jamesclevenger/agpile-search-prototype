@@ -24,7 +24,7 @@ variable "resource_group_name" {
 variable "location" {
   description = "Azure region"
   type        = string
-  default     = "East US"
+  default     = "East US 2"
 }
 
 variable "environment" {
@@ -159,7 +159,7 @@ resource "azurerm_container_group" "web" {
       SOLR_HOST      = azurerm_container_group.solr.fqdn
       SOLR_PORT      = "8983"
       SOLR_CORE      = "unity_catalog"
-      NEXTAUTH_URL   = "https://unity-catalog-web-${var.environment}.eastus.azurecontainer.io"
+      NEXTAUTH_URL   = "https://unity-catalog-web-${var.environment}.eastus2.azurecontainer.io"
     }
 
     secure_environment_variables = {

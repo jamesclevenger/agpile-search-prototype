@@ -1,6 +1,6 @@
 # Azure Infrastructure Configuration
 resource_group_name = "rg-unity-catalog-search"
-location           = "East US"
+location           = "East US 2"
 environment        = "dev"
 
 # Database Configuration

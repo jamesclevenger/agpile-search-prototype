@@ -1,6 +1,6 @@
 # Production Environment Configuration
 resource_group_name = "rg-unity-catalog-search"
-location           = "East US"
+location           = "East US 2"
 environment        = "prod"
 
 # Production-specific settings (these will be set via GitHub Secrets)
