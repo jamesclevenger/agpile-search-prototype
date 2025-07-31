@@ -63,15 +63,9 @@ Add these secrets to your GitHub repository:
 | `DATABRICKS_TOKEN` | Databricks access token | `dapi123...` |
 | `DATABRICKS_WORKSPACE_URL` | Databricks workspace URL | `https://your-workspace.cloud.databricks.com` |
 
-### 3. ACR Secrets (Auto-generated)
+### 3. ACR Authentication
 
-After first Terraform run, add these ACR secrets:
-
-| Secret Name | Description |
-|-------------|-------------|
-| `ACR_LOGIN_SERVER` | ACR login server URL |
-| `ACR_USERNAME` | ACR admin username |
-| `ACR_PASSWORD` | ACR admin password |
+ACR authentication is handled automatically via Azure CLI in the GitHub Actions workflow. No additional ACR secrets are required.
 
 ## Deployment Workflow
 
