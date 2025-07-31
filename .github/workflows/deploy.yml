@@ -1,9 +1,16 @@
 name: Deploy to Azure Container Instances
 
 on:
-  push:
-    branches: [main, develop]
-  # Remove pull_request trigger to avoid unnecessary deployments
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+        - dev
+        - prod
 
 env:
   AZURE_RESOURCE_GROUP: rg-unity-catalog-search
@@ -25,13 +32,7 @@ jobs:
     - name: Set environment suffix
       id: set-env
       run: |
-        if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-          echo "environment=prod" >> $GITHUB_OUTPUT
-        elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
-          echo "environment=dev" >> $GITHUB_OUTPUT
-        else
-          echo "environment=dev" >> $GITHUB_OUTPUT
-        fi
+        echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
 
     - name: Azure Login
       uses: azure/login@v1
@@ -114,10 +115,9 @@ jobs:
       with:
         images: ${{ needs.deploy-infrastructure.outputs.acr-login-server }}/${{ env.WEB_IMAGE_NAME }}
         tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=sha,prefix={{branch}}-
-          type=raw,value=latest,enable={{is_default_branch}}
+          type=raw,value=${{ needs.deploy-infrastructure.outputs.environment }}
+          type=sha,prefix=${{ needs.deploy-infrastructure.outputs.environment }}-
+          type=raw,value=latest
 
     - name: Extract metadata for Batch image
       id: meta-batch
@@ -125,10 +125,9 @@ jobs:
       with:
         images: ${{ needs.deploy-infrastructure.outputs.acr-login-server }}/${{ env.BATCH_IMAGE_NAME }}
         tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=sha,prefix={{branch}}-
-          type=raw,value=latest,enable={{is_default_branch}}
+          type=raw,value=${{ needs.deploy-infrastructure.outputs.environment }}
+          type=sha,prefix=${{ needs.deploy-infrastructure.outputs.environment }}-
+          type=raw,value=latest
 
     - name: Build and push Web image
       id: build-web
