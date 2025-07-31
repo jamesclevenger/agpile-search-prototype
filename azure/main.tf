@@ -72,12 +72,15 @@ resource "azurerm_mysql_flexible_server" "mysql" {
   administrator_login    = "unityadmin"
   administrator_password = var.mysql_admin_password
   backup_retention_days  = 7
-  sku_name              = "B_Standard_B1s"
-  version               = "8.0.21"
+  sku_name              = "GP_Standard_D2s_v3"
+  version               = "8.0"
 
   storage {
     size_gb = 20
   }
+
+  # Specify availability zone to avoid region issues
+  zone = "1"
 
   tags = {
     Environment = var.environment
