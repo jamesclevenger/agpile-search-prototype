@@ -108,6 +108,17 @@ if ! az storage account create \
   exit 1
 fi
 
+echo "Waiting for storage account to be fully provisioned..."
+# Wait for storage account to be ready (up to 2 minutes)
+for i in {1..24}; do
+  if az storage account show --name "$STORAGE_ACCOUNT_NAME" --resource-group "$RESOURCE_GROUP" --query "provisioningState" -o tsv | grep -q "Succeeded"; then
+    echo "Storage account provisioned successfully"
+    break
+  fi
+  echo "Waiting... (attempt $i/24)"
+  sleep 5
+done
+
 echo "Getting storage account key..."
 ACCOUNT_KEY=$(az storage account keys list \
   --resource-group "$RESOURCE_GROUP" \
@@ -128,6 +139,11 @@ if ! az storage container create \
   echo -e "${RED}Error: Failed to create storage container${NC}"
   exit 1
 fi
+
+# Store storage account name as GitHub secret for Terraform backend
+echo -e "${YELLOW}Setting storage account name as GitHub secret...${NC}"
+gh secret set TF_STORAGE_ACCOUNT_NAME --body "$STORAGE_ACCOUNT_NAME"
+gh secret set TF_RESOURCE_GROUP_NAME --body "$RESOURCE_GROUP"
 
 # Create backend configuration
 cat > backend.tf << EOF
@@ -159,6 +175,8 @@ echo "✓ AZURE_SUBSCRIPTION_ID"
 echo "✓ MYSQL_ADMIN_PASSWORD"
 echo "✓ DATABRICKS_TOKEN"
 echo "✓ DATABRICKS_WORKSPACE_URL"
+echo "✓ TF_STORAGE_ACCOUNT_NAME"
+echo "✓ TF_RESOURCE_GROUP_NAME"
 echo ""
 echo -e "${YELLOW}Note: ACR authentication is handled automatically via Azure CLI in the workflow.${NC}"
 echo "No additional ACR secrets are required."
