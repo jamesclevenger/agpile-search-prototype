@@ -2,7 +2,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~>3.0"
+      version = "~> 3.110"
     }
   }
 }
@@ -64,6 +64,27 @@ resource "azurerm_container_registry" "acr" {
   }
 }
 
+# Import images to ACR
+resource "null_resource" "import_mysql_image" {
+  provisioner "local-exec" {
+    command = "az acr import --name ${azurerm_container_registry.acr.name} --source docker.io/library/mysql:8.0 --image mysql:8.0"
+  }
+
+  triggers = {
+    acr_name = azurerm_container_registry.acr.name
+  }
+}
+
+resource "null_resource" "import_solr_image" {
+  provisioner "local-exec" {
+    command = "az acr import --name ${azurerm_container_registry.acr.name} --source docker.io/library/solr:9.6 --image solr:9.6"
+  }
+
+  triggers = {
+    acr_name = azurerm_container_registry.acr.name
+  }
+}
+
 # Storage Account for MySQL data persistence
 resource "azurerm_storage_account" "mysql" {
   name                     = "mysql${var.environment}${random_string.suffix.result}"
@@ -96,7 +117,7 @@ resource "azurerm_container_group" "mysql" {
 
   container {
     name   = "mysql"
-    image  = "ghcr.io/library/mysql:8.0"
+    image  = "${azurerm_container_registry.acr.login_server}/mysql:8.0"
     cpu    = "1"
     memory = "2"
 
@@ -125,10 +146,20 @@ resource "azurerm_container_group" "mysql" {
     }
   }
 
+  image_registry_credential {
+    server   = azurerm_container_registry.acr.login_server
+    username = azurerm_container_registry.acr.admin_username
+    password = azurerm_container_registry.acr.admin_password
+  }
+
   tags = {
     Environment = var.environment
     Project     = "unity-catalog-search"
   }
+
+  depends_on = [
+    null_resource.import_mysql_image
+  ]
 }
 
 # Storage Account for Solr data
@@ -225,7 +256,7 @@ resource "azurerm_container_group" "solr" {
 
   container {
     name   = "solr"
-    image  = "solr:9.6"
+    image  = "${azurerm_container_registry.acr.login_server}/solr:9.6"
     cpu    = "1"
     memory = "2"
 
@@ -249,10 +280,20 @@ resource "azurerm_container_group" "solr" {
     commands = ["bash", "-c", "solr-precreate unity_catalog && solr-foreground"]
   }
 
+  image_registry_credential {
+    server   = azurerm_container_registry.acr.login_server
+    username = azurerm_container_registry.acr.admin_username
+    password = azurerm_container_registry.acr.admin_password
+  }
+
   tags = {
     Environment = var.environment
     Project     = "unity-catalog-search"
   }
+
+  depends_on = [
+    null_resource.import_solr_image
+  ]
 }
 
 # Container Group for Batch Service
@@ -312,7 +353,7 @@ variable "databricks_token" {
   sensitive   = true
 }
 
-variable "databricks_workspace_url" {
+variable "databricks_workspace__url" {
   description = "Databricks workspace URL"
   type        = string
 }
@@ -333,29 +374,6 @@ variable "batch_image" {
 resource "random_string" "nextauth_secret" {
   length  = 32
   special = true
-}
-
-# Import images into ACR
-resource "azurerm_container_registry_import" "mysql" {
-  name                = azurerm_container_registry.acr.name
-  resource_group_name = azurerm_resource_group.main.name
-  source {
-    source_image = "mysql:8.0"
-    registry_uri = "docker.io"
-  }
-  target_tags = ["mysql:8.0"]
-  mode        = "Force" # Overwrite existing tags
-}
-
-resource "azurerm_container_registry_import" "solr" {
-  name                = azurerm_container_registry.acr.name
-  resource_group_name = azurerm_resource_group.main.name
-  source {
-    source_image = "solr:9.6"
-    registry_uri = "docker.io"
-  }
-  target_tags = ["solr:9.6"]
-  mode        = "Force" # Overwrite existing tags
 }
 
 # Outputs
