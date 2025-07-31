@@ -65,12 +65,22 @@ az account set --subscription "$SUBSCRIPTION_ID"
 # Create service principal for GitHub Actions
 echo -e "${YELLOW}Creating service principal for GitHub Actions...${NC}"
 SP_OUTPUT=$(az ad sp create-for-rbac \
-  --name "agpile-github-actions.jameseclevengerhotmail.onmicrosoft.com" \
+  --name "fairgrounds-github-actions" \
   --role contributor \
   --scopes "/subscriptions/$SUBSCRIPTION_ID" \
   --sdk-auth)
 
 echo -e "${GREEN}✓ Service principal created${NC}"
+
+# Add Storage Account Key Operator role for Terraform backend access
+echo -e "${YELLOW}Adding Storage Account Key Operator role...${NC}"
+SP_ID=$(echo "$SP_OUTPUT" | jq -r '.clientId')
+az role assignment create \
+  --assignee "$SP_ID" \
+  --role "Storage Account Key Operator Service Role" \
+  --scope "/subscriptions/$SUBSCRIPTION_ID"
+
+echo -e "${GREEN}✓ Additional role assigned${NC}"
 
 # Create initial resource group
 echo -e "${YELLOW}Creating resource group...${NC}"
