@@ -72,8 +72,35 @@ jobs:
       id: terraform-output
       run: |
         cd azure
+        
+        # Debug: Print environment variables (unobfuscated)
+        echo "=== DEBUG: Authentication Variables ==="
+        echo "ARM_CLIENT_ID: $ARM_CLIENT_ID"
+        echo "ARM_TENANT_ID: $ARM_TENANT_ID"
+        echo "ARM_SUBSCRIPTION_ID: $ARM_SUBSCRIPTION_ID"
+        echo "ARM_CLIENT_SECRET length: ${#ARM_CLIENT_SECRET}"
+        echo "======================================="
+        
+        # Debug: Show current Azure context
+        echo "=== DEBUG: Azure Context ==="
+        az account show --output table || echo "Failed to show account"
+        echo "============================="
+        
+        # Debug: Show Terraform backend config
+        echo "=== DEBUG: Terraform Backend ==="
+        echo "Current directory: $(pwd)"
+        ls -la
+        echo "Backend file contents:"
+        cat backend.tf
+        echo "==============================="
+        
+        # Try to get outputs
+        echo "=== DEBUG: Getting Terraform Outputs ==="
+        terraform output || echo "Terraform output failed"
         ACR_LOGIN_SERVER=$(terraform output -raw container_registry_login_server)
+        echo "ACR_LOGIN_SERVER: $ACR_LOGIN_SERVER"
         echo "acr-login-server=$ACR_LOGIN_SERVER" >> $GITHUB_OUTPUT
+        echo "========================================"
         
         # Wait for ACR to be fully ready
         echo "Waiting for ACR to be ready..."
@@ -86,10 +113,10 @@ jobs:
           sleep 30
         done
       env:
-        # Service Principal authentication for Terraform                                                                                                                          │ │
-        ARM_CLIENT_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).clientId }}                                                                                                        │ │
-        ARM_CLIENT_SECRET: ${{ fromJson(secrets.AZURE_CREDENTIALS).clientSecret }}                                                                                                │ │
-        ARM_SUBSCRIPTION_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}                                                                                            │ │
+        # Service Principal authentication for Terraform
+        ARM_CLIENT_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).clientId }}
+        ARM_CLIENT_SECRET: ${{ fromJson(secrets.AZURE_CREDENTIALS).clientSecret }}
+        ARM_SUBSCRIPTION_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}
         ARM_TENANT_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).tenantId }}  
 
   build-and-push:
