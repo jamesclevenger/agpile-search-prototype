@@ -17,7 +17,7 @@ export async function GET() {
     await connection.ping();
     
     // Test basic query to ensure database is properly initialized
-    const [rows] = await connection.execute('SELECT 1 as test');
+    const [_rows] = await connection.execute('SELECT 1 as test');
     
     await connection.end();
 
