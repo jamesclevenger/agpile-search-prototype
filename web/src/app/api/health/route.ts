@@ -11,7 +11,6 @@ export async function GET() {
       password: process.env.MYSQL_PASSWORD,
       database: process.env.MYSQL_DB,
       connectTimeout: 10000,  // 10 second timeout
-      acquireTimeout: 10000,
     });
 
     await connection.ping();
