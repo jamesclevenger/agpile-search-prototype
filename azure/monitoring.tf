@@ -68,7 +68,7 @@ resource "azurerm_monitor_metric_alert" "web_availability" {
 }
 
 # Dashboard for monitoring
-resource "azurerm_dashboard" "main" {
+resource "azurerm_portal_dashboard" "main" {
   name                = "dashboard-unity-catalog-${var.environment}"
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
