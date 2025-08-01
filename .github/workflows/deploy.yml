@@ -197,6 +197,12 @@ jobs:
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
+        terraform_wrapper: false
+
     - name: Update Container Instances
       run: |
         ENV="${{ needs.deploy-infrastructure.outputs.environment }}"
@@ -224,6 +230,16 @@ jobs:
         
         echo "Re-running Terraform to recreate containers with updated images..."
         cd azure
+        
+        # Initialize Terraform
+        terraform init -reconfigure \
+          -backend-config="resource_group_name=${{ secrets.TF_RESOURCE_GROUP_NAME }}" \
+          -backend-config="storage_account_name=${{ secrets.TF_STORAGE_ACCOUNT_NAME }}" \
+          -backend-config="container_name=tfstate" \
+          -backend-config="key=terraform.tfstate"
+        
+        # Select workspace
+        terraform workspace select ${{ needs.deploy-infrastructure.outputs.environment }} || terraform workspace new ${{ needs.deploy-infrastructure.outputs.environment }}
         
         # Update Terraform variables to use actual images
         export TF_VAR_web_image="${ACR_NAME}.azurecr.io/unity-catalog-web:latest"
