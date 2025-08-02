@@ -181,7 +181,7 @@ resource "azurerm_container_group" "web" {
 
   container {
     name   = "web"
-    image  = contains(["nginx:alpine", "alpine:latest"], var.web_image) ? var.web_image : "${azurerm_container_registry.acr.login_server}/${var.web_image}"
+    image  = var.web_image
     cpu    = "1"
     memory = "2"
 
@@ -207,7 +207,7 @@ resource "azurerm_container_group" "web" {
     }
   }
 
-  # Use Docker Hub credentials for base images, ACR credentials for custom images
+  # Use Docker Hub credentials for base images, ACR credentials for ACR images
   dynamic "image_registry_credential" {
     for_each = contains(["nginx:alpine", "alpine:latest"], var.web_image) ? [1] : []
     content {
@@ -218,7 +218,7 @@ resource "azurerm_container_group" "web" {
   }
 
   dynamic "image_registry_credential" {
-    for_each = contains(["nginx:alpine", "alpine:latest"], var.web_image) ? [] : [1]
+    for_each = can(regex("\\.azurecr\\.io/", var.web_image)) ? [1] : []
     content {
       server   = azurerm_container_registry.acr.login_server
       username = azurerm_container_registry.acr.admin_username
@@ -295,7 +295,7 @@ resource "azurerm_container_group" "batch" {
 
   container {
     name   = "batch"
-    image  = contains(["nginx:alpine", "alpine:latest"], var.batch_image) ? var.batch_image : "${azurerm_container_registry.acr.login_server}/${var.batch_image}"
+    image  = var.batch_image
     cpu    = "0.5"
     memory = "1"
 
@@ -316,7 +316,7 @@ resource "azurerm_container_group" "batch" {
     }
   }
 
-  # Use Docker Hub credentials for base images, ACR credentials for custom images
+  # Use Docker Hub credentials for base images, ACR credentials for ACR images
   dynamic "image_registry_credential" {
     for_each = contains(["nginx:alpine", "alpine:latest"], var.batch_image) ? [1] : []
     content {
@@ -327,7 +327,7 @@ resource "azurerm_container_group" "batch" {
   }
 
   dynamic "image_registry_credential" {
-    for_each = contains(["nginx:alpine", "alpine:latest"], var.batch_image) ? [] : [1]
+    for_each = can(regex("\\.azurecr\\.io/", var.batch_image)) ? [1] : []
     content {
       server   = azurerm_container_registry.acr.login_server
       username = azurerm_container_registry.acr.admin_username
