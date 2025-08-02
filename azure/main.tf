@@ -189,31 +189,6 @@ resource "azurerm_storage_share" "solr" {
   quota                = 50
 }
 
-# File Share for Solr configuration
-resource "azurerm_storage_share" "solr_config" {
-  name                 = "solr-config"
-  storage_account_name = azurerm_storage_account.solr.name
-  quota                = 1
-}
-
-# Upload Solr configuration files
-resource "azurerm_storage_share_file" "solr_schema" {
-  name             = "schema.xml"
-  storage_share_id = azurerm_storage_share.solr_config.id
-  source           = "${path.module}/../docker/solr/configsets/unity_catalog_config/conf/schema.xml"
-}
-
-resource "azurerm_storage_share_file" "solr_config_xml" {
-  name             = "solrconfig.xml"
-  storage_share_id = azurerm_storage_share.solr_config.id
-  source           = "${path.module}/../docker/solr/configsets/unity_catalog_config/conf/solrconfig.xml"
-}
-
-resource "azurerm_storage_share_file" "solr_stopwords" {
-  name             = "stopwords.txt"
-  storage_share_id = azurerm_storage_share.solr_config.id
-  source           = "${path.module}/../docker/solr/configsets/unity_catalog_config/conf/stopwords.txt"
-}
 
 # Random string for unique naming
 resource "random_string" "suffix" {
@@ -321,15 +296,7 @@ resource "azurerm_container_group" "solr" {
       share_name           = azurerm_storage_share.solr.name
     }
 
-    volume {
-      name                 = "solr-config"
-      mount_path           = "/opt/solr/server/solr/configsets/unity_catalog_config/conf"
-      storage_account_name = azurerm_storage_account.solr.name
-      storage_account_key  = azurerm_storage_account.solr.primary_access_key
-      share_name           = azurerm_storage_share.solr_config.name
-    }
-
-    commands = ["bash", "-c", "solr-precreate unity_catalog /opt/solr/server/solr/configsets/unity_catalog_config"]
+    commands = ["bash", "-c", "solr-foreground & sleep 30 && solr create_core -c unity_catalog && wait"]
   }
 
   image_registry_credential {
@@ -338,11 +305,6 @@ resource "azurerm_container_group" "solr" {
     password = var.docker_hub_token
   }
 
-  depends_on = [
-    azurerm_storage_share_file.solr_schema,
-    azurerm_storage_share_file.solr_config_xml,
-    azurerm_storage_share_file.solr_stopwords
-  ]
 
   tags = {
     Environment = var.environment
