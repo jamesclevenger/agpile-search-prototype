@@ -299,21 +299,33 @@ jobs:
         
         if [[ -n "$WEB_URL" ]]; then
           echo "Testing web service health endpoint..."
-          for i in {1..10}; do
-            if curl -f -s "http://${WEB_URL}:3000/api/health" > /dev/null; then
+          for i in {1..15}; do
+            echo "Attempting health check (attempt $i/15)..."
+            HEALTH_RESPONSE=$(curl -s -w "HTTP_CODE:%{http_code}" "http://${WEB_URL}:3000/api/health" 2>/dev/null || echo "CURL_FAILED")
+            
+            if [[ "$HEALTH_RESPONSE" == *"HTTP_CODE:200"* ]]; then
               echo "✅ Web service health check passed!"
               echo "🌐 Application URL: http://${WEB_URL}:3000"
               break
+            else
+              echo "Health check failed. Response: $HEALTH_RESPONSE"
+              if [[ "$i" -lt 15 ]]; then
+                echo "Waiting 45 seconds before retry..."
+                sleep 45
+              fi
             fi
-            echo "Web service not ready yet, waiting 30 seconds... (attempt $i/10)"
-            sleep 30
           done
           
-          # Final health check
-          curl -f "http://${WEB_URL}:3000/api/health" || {
-            echo "❌ Final health check failed"
+          # Final diagnostic health check
+          echo "Running final health check..."
+          FINAL_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}\nTOTAL_TIME:%{time_total}" "http://${WEB_URL}:3000/api/health" 2>/dev/null)
+          echo "Final response: $FINAL_RESPONSE"
+          
+          if ! curl -f -s "http://${WEB_URL}:3000/api/health" > /dev/null; then
+            echo "❌ Final health check failed - checking container logs..."
+            az container logs --resource-group "$RG_NAME" --name "aci-unity-web-${ENV}" --tail 50 || echo "Could not get web logs"
             exit 1
-          }
+          fi
           
           echo "🎉 Deployment successful for environment: ${ENV}"
         else
