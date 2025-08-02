@@ -122,16 +122,29 @@ if [ -n "$STARTUP_DELAY" ] && [ "$STARTUP_DELAY" -gt 0 ]; then
     sleep "$STARTUP_DELAY"
 fi
 
-# Wait for dependencies if environment variables are set
+# Wait for dependencies if environment variables are set (with fallback)
+DEPENDENCY_CHECK_FAILED=false
+
 if [ -n "$MYSQL_HOST" ] && [ -n "$MYSQL_PORT" ]; then
-    wait_for_mysql "$MYSQL_HOST" "$MYSQL_PORT"
+    if ! wait_for_mysql "$MYSQL_HOST" "$MYSQL_PORT"; then
+        echo "⚠️  MySQL dependency check failed, but continuing with startup..."
+        DEPENDENCY_CHECK_FAILED=true
+    fi
 fi
 
 if [ -n "$SOLR_HOST" ] && [ -n "$SOLR_PORT" ] && [ -n "$SOLR_CORE" ]; then
-    wait_for_solr "$SOLR_HOST" "$SOLR_PORT" "$SOLR_CORE"
+    if ! wait_for_solr "$SOLR_HOST" "$SOLR_PORT" "$SOLR_CORE"; then
+        echo "⚠️  Solr dependency check failed, but continuing with startup..."
+        DEPENDENCY_CHECK_FAILED=true
+    fi
 fi
 
-echo "🚀 All dependencies ready, starting Next.js server..."
+if [ "$DEPENDENCY_CHECK_FAILED" = true ]; then
+    echo "⚠️  Some dependencies failed to initialize properly."
+    echo "🚀 Starting Next.js server anyway - health endpoint will show dependency status..."
+else
+    echo "🚀 All dependencies ready, starting Next.js server..."
+fi
 
 # Start the Next.js application
 exec node server.js

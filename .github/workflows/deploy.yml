@@ -298,17 +298,55 @@ jobs:
           --output tsv)
         
         if [[ -n "$WEB_URL" ]]; then
-          echo "Testing web service health endpoint..."
+          echo "Web URL: $WEB_URL"
+          echo "Testing web service accessibility..."
+          
+          # First, let's check container status in detail
+          echo "=== Container Status Check ==="
+          WEB_STATUS=$(az container show --resource-group "$RG_NAME" --name "aci-unity-web-${ENV}" --query "containers[0].instanceView.currentState.state" -o tsv 2>/dev/null || echo "NotFound")
+          echo "Web container status: $WEB_STATUS"
+          
+          if [[ "$WEB_STATUS" != "Running" ]]; then
+            echo "❌ Web container is not running! Status: $WEB_STATUS"
+            echo "Getting container details..."
+            az container show --resource-group "$RG_NAME" --name "aci-unity-web-${ENV}" --query "containers[0].instanceView" -o json || echo "Failed to get container details"
+            echo "Getting container logs..."
+            az container logs --resource-group "$RG_NAME" --name "aci-unity-web-${ENV}" --tail 50 || echo "Failed to get logs"
+            exit 1
+          fi
+          
+          # Check basic connectivity
+          echo "=== Connectivity Check ==="
+          echo "Testing basic connectivity to $WEB_URL:3000..."
+          if timeout 10 bash -c "</dev/tcp/$WEB_URL/3000" 2>/dev/null; then
+            echo "✅ Port 3000 is accessible"
+          else
+            echo "❌ Port 3000 is not accessible"
+            echo "Checking if container has proper IP assignment..."
+            az container show --resource-group "$RG_NAME" --name "aci-unity-web-${ENV}" --query "ipAddress" -o json
+          fi
+          
+          echo "=== Health Endpoint Testing ==="
           for i in {1..15}; do
             echo "Attempting health check (attempt $i/15)..."
-            HEALTH_RESPONSE=$(curl -s -w "HTTP_CODE:%{http_code}" "http://${WEB_URL}:3000/api/health" 2>/dev/null || echo "CURL_FAILED")
+            
+            # Detailed curl with more debugging
+            HEALTH_RESPONSE=$(curl -v -s -w "HTTP_CODE:%{http_code}" "http://${WEB_URL}:3000/api/health" 2>&1 || echo "CURL_FAILED")
+            echo "Full curl response: $HEALTH_RESPONSE"
             
             if [[ "$HEALTH_RESPONSE" == *"HTTP_CODE:200"* ]]; then
               echo "✅ Web service health check passed!"
               echo "🌐 Application URL: http://${WEB_URL}:3000"
               break
             else
-              echo "Health check failed. Response: $HEALTH_RESPONSE"
+              echo "Health check failed."
+              
+              # Get recent container logs on failure
+              if [[ $i -eq 1 ]] || [[ $i -eq 5 ]] || [[ $i -eq 10 ]]; then
+                echo "Getting recent container logs (attempt $i)..."
+                az container logs --resource-group "$RG_NAME" --name "aci-unity-web-${ENV}" --tail 20 || echo "Could not get logs"
+              fi
+              
               if [[ "$i" -lt 15 ]]; then
                 echo "Waiting 45 seconds before retry..."
                 sleep 45
