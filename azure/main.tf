@@ -181,7 +181,7 @@ resource "azurerm_container_group" "web" {
 
   container {
     name   = "web"
-    image  = "${azurerm_container_registry.acr.login_server}/${var.web_image}"
+    image  = contains(["nginx:alpine", "alpine:latest"], var.web_image) ? var.web_image : "${azurerm_container_registry.acr.login_server}/${var.web_image}"
     cpu    = "1"
     memory = "2"
 
@@ -211,6 +211,12 @@ resource "azurerm_container_group" "web" {
     server   = azurerm_container_registry.acr.login_server
     username = azurerm_container_registry.acr.admin_username
     password = azurerm_container_registry.acr.admin_password
+  }
+
+  image_registry_credential {
+    server   = "index.docker.io"
+    username = var.docker_hub_username
+    password = var.docker_hub_token
   }
 
   depends_on = [
@@ -282,7 +288,7 @@ resource "azurerm_container_group" "batch" {
 
   container {
     name   = "batch"
-    image  = "${azurerm_container_registry.acr.login_server}/${var.batch_image}"
+    image  = contains(["nginx:alpine", "alpine:latest"], var.batch_image) ? var.batch_image : "${azurerm_container_registry.acr.login_server}/${var.batch_image}"
     cpu    = "0.5"
     memory = "1"
 
@@ -307,6 +313,12 @@ resource "azurerm_container_group" "batch" {
     server   = azurerm_container_registry.acr.login_server
     username = azurerm_container_registry.acr.admin_username
     password = azurerm_container_registry.acr.admin_password
+  }
+
+  image_registry_credential {
+    server   = "index.docker.io"
+    username = var.docker_hub_username
+    password = var.docker_hub_token
   }
 
   depends_on = [
