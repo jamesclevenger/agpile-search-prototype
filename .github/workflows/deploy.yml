@@ -55,7 +55,7 @@ jobs:
           -backend-config="container_name=tfstate" \
           -backend-config="key=terraform.tfstate"
         terraform workspace select ${{ steps.set-env.outputs.environment }} || terraform workspace new ${{ steps.set-env.outputs.environment }}
-        terraform plan -var-file="environments/${{ steps.set-env.outputs.environment }}.tfvars" -out=tfplan
+        terraform plan -out=tfplan
         terraform apply -auto-approve tfplan
       env:
         # Service Principal authentication for Terraform
@@ -64,43 +64,23 @@ jobs:
         ARM_SUBSCRIPTION_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}
         ARM_TENANT_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).tenantId }}
         # Application variables
+        TF_VAR_resource_group_name: ${{ env.AZURE_RESOURCE_GROUP }}
+        TF_VAR_location: "West US 2"
+        TF_VAR_environment: ${{ needs.deploy-infrastructure.outputs.environment || steps.set-env.outputs.environment }}
         TF_VAR_mysql_admin_password: ${{ secrets.MYSQL_ADMIN_PASSWORD }}
         TF_VAR_databricks_token: ${{ secrets.DATABRICKS_TOKEN }}
         TF_VAR_databricks_workspace_url: ${{ secrets.DATABRICKS_WORKSPACE_URL }}
+        TF_VAR_docker_hub_username: ${{ secrets.DOCKER_HUB_USERNAME }}
+        TF_VAR_docker_hub_token: ${{ secrets.DOCKER_HUB_TOKEN }}
 
     - name: Get Terraform Outputs
       id: terraform-output
       run: |
         cd azure
         
-        # Debug: Print environment variables (unobfuscated)
-        echo "=== DEBUG: Authentication Variables ==="
-        echo "ARM_CLIENT_ID: $ARM_CLIENT_ID"
-        echo "ARM_TENANT_ID: $ARM_TENANT_ID"
-        echo "ARM_SUBSCRIPTION_ID: $ARM_SUBSCRIPTION_ID"
-        echo "ARM_CLIENT_SECRET length: ${#ARM_CLIENT_SECRET}"
-        echo "======================================="
-        
-        # Debug: Show current Azure context
-        echo "=== DEBUG: Azure Context ==="
-        az account show --output table || echo "Failed to show account"
-        echo "============================="
-        
-        # Debug: Show Terraform backend config
-        echo "=== DEBUG: Terraform Backend ==="
-        echo "Current directory: $(pwd)"
-        ls -la
-        echo "Backend file contents:"
-        cat backend.tf
-        echo "==============================="
-        
-        # Try to get outputs
-        echo "=== DEBUG: Getting Terraform Outputs ==="
-        terraform output || echo "Terraform output failed"
+        # Get Terraform outputs
         ACR_LOGIN_SERVER=$(terraform output -raw container_registry_login_server)
-        echo "ACR_LOGIN_SERVER: $ACR_LOGIN_SERVER"
         echo "acr-login-server=$ACR_LOGIN_SERVER" >> $GITHUB_OUTPUT
-        echo "========================================"
         
         # Wait for ACR to be fully ready
         echo "Waiting for ACR to be ready..."
@@ -109,8 +89,8 @@ jobs:
             echo "ACR is ready!"
             break
           fi
-          echo "ACR not ready yet, waiting 30 seconds..."
-          sleep 30
+          echo "ACR not ready yet, waiting 15 seconds... (attempt $i/10)"
+          sleep 15
         done
       env:
         # Service Principal authentication for Terraform
@@ -146,8 +126,7 @@ jobs:
       with:
         images: ${{ needs.deploy-infrastructure.outputs.acr-login-server }}/${{ env.WEB_IMAGE_NAME }}
         tags: |
-          type=raw,value=${{ needs.deploy-infrastructure.outputs.environment }}
-          type=sha,prefix=${{ needs.deploy-infrastructure.outputs.environment }}-
+          type=raw,value=${{ github.sha }}
           type=raw,value=latest
 
     - name: Extract metadata for Batch image
@@ -156,8 +135,7 @@ jobs:
       with:
         images: ${{ needs.deploy-infrastructure.outputs.acr-login-server }}/${{ env.BATCH_IMAGE_NAME }}
         tags: |
-          type=raw,value=${{ needs.deploy-infrastructure.outputs.environment }}
-          type=sha,prefix=${{ needs.deploy-infrastructure.outputs.environment }}-
+          type=raw,value=${{ github.sha }}
           type=raw,value=latest
 
     - name: Build and push Web image
@@ -184,6 +162,34 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
+    - name: Wait for images to be available
+      run: |
+        ACR_NAME="${{ env.ACR_NAME }}${{ needs.deploy-infrastructure.outputs.environment }}"
+        
+        echo "Waiting for images to be available in ACR..."
+        
+        # Wait for web image
+        for i in {1..30}; do
+          if az acr repository show --name "$ACR_NAME" --repository "${{ env.WEB_IMAGE_NAME }}" --query "name" -o tsv &>/dev/null; then
+            echo "Web image is available!"
+            break
+          fi
+          echo "Web image not yet available, waiting 10 seconds... (attempt $i/30)"
+          sleep 10
+        done
+        
+        # Wait for batch image  
+        for i in {1..30}; do
+          if az acr repository show --name "$ACR_NAME" --repository "${{ env.BATCH_IMAGE_NAME }}" --query "name" -o tsv &>/dev/null; then
+            echo "Batch image is available!"
+            break
+          fi
+          echo "Batch image not yet available, waiting 10 seconds... (attempt $i/30)"
+          sleep 10
+        done
+        
+        echo "All images are available in ACR"
+
   update-containers:
     needs: [deploy-infrastructure, build-and-push]
     runs-on: ubuntu-latest
@@ -209,26 +215,7 @@ jobs:
         RG_NAME="${{ env.AZURE_RESOURCE_GROUP }}-${ENV}"
         ACR_NAME="${{ env.ACR_NAME }}${ENV}"
         
-        echo "Deleting existing container groups to force image update..."
-        
-        # Delete Web Container Group
-        az container delete \
-          --resource-group "$RG_NAME" \
-          --name "aci-unity-web-${ENV}" \
-          --yes || echo "Web container group not found or already deleted"
-        
-        # Delete Batch Container Group  
-        az container delete \
-          --resource-group "$RG_NAME" \
-          --name "aci-unity-batch-${ENV}" \
-          --yes || echo "Batch container group not found or already deleted"
-        
-        # Note: MySQL container is NOT deleted to preserve data and avoid downtime
-        
-        echo "Waiting for deletions to complete..."
-        sleep 30
-        
-        echo "Re-running Terraform to recreate containers with updated images..."
+        echo "Updating containers with new images using Terraform..."
         cd azure
         
         # Initialize Terraform
@@ -241,19 +228,15 @@ jobs:
         # Select workspace
         terraform workspace select ${{ needs.deploy-infrastructure.outputs.environment }} || terraform workspace new ${{ needs.deploy-infrastructure.outputs.environment }}
         
-        # Update Terraform variables to use actual images
-        export TF_VAR_web_image="${ACR_NAME}.azurecr.io/unity-catalog-web:latest"
-        export TF_VAR_batch_image="${ACR_NAME}.azurecr.io/unity-catalog-batch:latest"
+        # Update Terraform variables to use actual images with unique tags to force replacement
+        export TF_VAR_web_image="${ACR_NAME}.azurecr.io/unity-catalog-web:${{ github.sha }}"
+        export TF_VAR_batch_image="${ACR_NAME}.azurecr.io/unity-catalog-batch:${{ github.sha }}"
         
-        # Apply all container groups (MySQL will be created on first run, updated on subsequent runs)
-        terraform apply -auto-approve \
-          -target=azurerm_container_group.mysql \
-          -target=azurerm_container_group.web \
-          -target=azurerm_container_group.batch \
-          -target=azurerm_container_group.solr
+        # Refresh state and apply changes - Terraform will handle replacements automatically
+        terraform refresh
+        terraform apply -auto-approve
         
-        echo "Waiting for containers to start and initialize..."
-        sleep 90  # Give MySQL extra time to initialize database
+        echo "Terraform deployment completed, containers are starting..."
       env:
         # Service Principal authentication for Terraform
         ARM_CLIENT_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).clientId }}
@@ -261,19 +244,53 @@ jobs:
         ARM_SUBSCRIPTION_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}
         ARM_TENANT_ID: ${{ fromJson(secrets.AZURE_CREDENTIALS).tenantId }}
         # Application variables
+        TF_VAR_resource_group_name: ${{ env.AZURE_RESOURCE_GROUP }}
+        TF_VAR_location: "West US 2"
+        TF_VAR_environment: ${{ needs.deploy-infrastructure.outputs.environment || steps.set-env.outputs.environment }}
         TF_VAR_mysql_admin_password: ${{ secrets.MYSQL_ADMIN_PASSWORD }}
         TF_VAR_databricks_token: ${{ secrets.DATABRICKS_TOKEN }}
         TF_VAR_databricks_workspace_url: ${{ secrets.DATABRICKS_WORKSPACE_URL }}
+        TF_VAR_docker_hub_username: ${{ secrets.DOCKER_HUB_USERNAME }}
+        TF_VAR_docker_hub_token: ${{ secrets.DOCKER_HUB_TOKEN }}
 
     - name: Run Health Checks
       run: |
         ENV="${{ needs.deploy-infrastructure.outputs.environment }}"
         RG_NAME="${{ env.AZURE_RESOURCE_GROUP }}-${ENV}"
         
-        # Wait for containers to start (reduced since we already waited 90s above)
-        sleep 30
+        echo "Waiting for all services to be ready..."
         
-        # Check web service health
+        # Function to check container status
+        check_container_status() {
+          local container_name=$1
+          local service_name=$2
+          
+          echo "Checking $service_name status..."
+          for i in {1..20}; do
+            STATUS=$(az container show \
+              --resource-group "$RG_NAME" \
+              --name "$container_name" \
+              --query "containers[0].instanceView.currentState.state" \
+              --output tsv 2>/dev/null || echo "NotFound")
+            
+            if [[ "$STATUS" == "Running" ]]; then
+              echo "$service_name is running!"
+              return 0
+            fi
+            echo "$service_name status: $STATUS, waiting 15 seconds... (attempt $i/20)"
+            sleep 15
+          done
+          echo "ERROR: $service_name failed to start"
+          return 1
+        }
+        
+        # Check all services
+        check_container_status "aci-unity-mysql-${ENV}" "MySQL"
+        check_container_status "aci-unity-solr-${ENV}" "Solr" 
+        check_container_status "aci-unity-web-${ENV}" "Web"
+        check_container_status "aci-unity-batch-${ENV}" "Batch"
+        
+        # Get web service URL
         WEB_URL=$(az container show \
           --resource-group "$RG_NAME" \
           --name "aci-unity-web-${ENV}" \
@@ -281,10 +298,26 @@ jobs:
           --output tsv)
         
         if [[ -n "$WEB_URL" ]]; then
-          curl -f "http://${WEB_URL}:3000/api/health" || exit 1
-          echo "Health check passed for environment: ${ENV}"
+          echo "Testing web service health endpoint..."
+          for i in {1..10}; do
+            if curl -f -s "http://${WEB_URL}:3000/api/health" > /dev/null; then
+              echo "✅ Web service health check passed!"
+              echo "🌐 Application URL: http://${WEB_URL}:3000"
+              break
+            fi
+            echo "Web service not ready yet, waiting 30 seconds... (attempt $i/10)"
+            sleep 30
+          done
+          
+          # Final health check
+          curl -f "http://${WEB_URL}:3000/api/health" || {
+            echo "❌ Final health check failed"
+            exit 1
+          }
+          
+          echo "🎉 Deployment successful for environment: ${ENV}"
         else
-          echo "Could not get container URL"
+          echo "❌ Could not get web container URL"
           exit 1
         fi
 

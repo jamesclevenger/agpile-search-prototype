@@ -68,48 +68,8 @@ resource "azurerm_container_registry" "acr" {
   }
 }
 
-# Import images to ACR if they don't exist
-resource "null_resource" "import_mysql_image" {
-  provisioner "local-exec" {
-    command = "az acr repository show --name ${azurerm_container_registry.acr.name} --image mysql:8.0 &> /dev/null || az acr import --name ${azurerm_container_registry.acr.name} --source docker.io/library/mysql:8.0 --image mysql:8.0"
-  }
-
-  triggers = {
-    acr_name = azurerm_container_registry.acr.name
-  }
-}
-
-resource "null_resource" "import_solr_image" {
-  provisioner "local-exec" {
-    command = "az acr repository show --name ${azurerm_container_registry.acr.name} --image solr:9.6 &> /dev/null || az acr import --name ${azurerm_container_registry.acr.name} --source docker.io/library/solr:9.6 --image solr:9.6"
-  }
-
-  triggers = {
-    acr_name = azurerm_container_registry.acr.name
-  }
-}
-
-resource "null_resource" "import_web_image" {
-  provisioner "local-exec" {
-    command = "az acr repository show --name ${azurerm_container_registry.acr.name} --image ${var.web_image} &> /dev/null || az acr import --name ${azurerm_container_registry.acr.name} --source docker.io/${var.web_image} --image ${var.web_image}"
-  }
-
-  triggers = {
-    acr_name   = azurerm_container_registry.acr.name
-    image_name = var.web_image
-  }
-}
-
-resource "null_resource" "import_batch_image" {
-  provisioner "local-exec" {
-    command = "az acr repository show --name ${azurerm_container_registry.acr.name} --image ${var.batch_image} &> /dev/null || az acr import --name ${azurerm_container_registry.acr.name} --source docker.io/${var.batch_image} --image ${var.batch_image}"
-  }
-
-  triggers = {
-    acr_name   = azurerm_container_registry.acr.name
-    image_name = var.batch_image
-  }
-}
+# Note: Base images (mysql, solr) are now pulled directly from Docker Hub
+# Only custom-built images (web, batch) are stored in ACR
 
 # Storage Account for MySQL data persistence
 resource "azurerm_storage_account" "mysql" {
@@ -143,7 +103,7 @@ resource "azurerm_container_group" "mysql" {
 
   container {
     name   = "mysql"
-    image  = "${azurerm_container_registry.acr.login_server}/mysql:8.0"
+    image  = "mysql:8.0"
     cpu    = "1"
     memory = "2"
 
@@ -171,19 +131,15 @@ resource "azurerm_container_group" "mysql" {
   }
 
   image_registry_credential {
-    server   = azurerm_container_registry.acr.login_server
-    username = azurerm_container_registry.acr.admin_username
-    password = azurerm_container_registry.acr.admin_password
+    server   = "index.docker.io"
+    username = var.docker_hub_username
+    password = var.docker_hub_token
   }
 
   tags = {
     Environment = var.environment
     Project     = "unity-catalog-search"
   }
-
-  depends_on = [
-    null_resource.import_mysql_image
-  ]
 }
 
 # Storage Account for Solr data
@@ -259,8 +215,7 @@ resource "azurerm_container_group" "web" {
 
   depends_on = [
     azurerm_container_group.mysql,
-    azurerm_container_group.solr,
-    null_resource.import_web_image
+    azurerm_container_group.solr
   ]
 
   tags = {
@@ -280,7 +235,7 @@ resource "azurerm_container_group" "solr" {
 
   container {
     name   = "solr"
-    image  = "${azurerm_container_registry.acr.login_server}/solr:9.6"
+    image  = "solr:9.6"
     cpu    = "1"
     memory = "2"
 
@@ -305,19 +260,15 @@ resource "azurerm_container_group" "solr" {
   }
 
   image_registry_credential {
-    server   = azurerm_container_registry.acr.login_server
-    username = azurerm_container_registry.acr.admin_username
-    password = azurerm_container_registry.acr.admin_password
+    server   = "index.docker.io"
+    username = var.docker_hub_username
+    password = var.docker_hub_token
   }
 
   tags = {
     Environment = var.environment
     Project     = "unity-catalog-search"
   }
-
-  depends_on = [
-    null_resource.import_solr_image
-  ]
 }
 
 # Container Group for Batch Service
@@ -360,8 +311,7 @@ resource "azurerm_container_group" "batch" {
 
   depends_on = [
     azurerm_container_group.mysql,
-    azurerm_container_group.solr,
-    null_resource.import_batch_image
+    azurerm_container_group.solr
   ]
 
   tags = {
@@ -392,6 +342,18 @@ variable "batch_image" {
   description = "Batch container image"
   type        = string
   default     = "alpine:latest"
+}
+
+variable "docker_hub_username" {
+  description = "Docker Hub username for authenticated pulls"
+  type        = string
+  sensitive   = true
+}
+
+variable "docker_hub_token" {
+  description = "Docker Hub personal access token"
+  type        = string
+  sensitive   = true
 }
 
 # Random secret for NextAuth

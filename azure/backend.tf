@@ -1,6 +1,8 @@
 terraform {
   backend "azurerm" {
-    # Backend configuration is provided via CLI parameters
-    # in the GitHub Actions workflow
+    resource_group_name  = "rg-unity-catalog-search"
+    storage_account_name = "tf1754144180"
+    container_name       = "tfstate"
+    key                  = "terraform.tfstate"
   }
 }

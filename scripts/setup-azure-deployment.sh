@@ -54,6 +54,11 @@ echo ""
 
 read -p "Databricks Workspace URL: " DATABRICKS_WORKSPACE_URL
 
+read -p "Docker Hub Username: " DOCKER_HUB_USERNAME
+
+read -s -p "Docker Hub Personal Access Token: " DOCKER_HUB_TOKEN
+echo ""
+
 # Azure login and setup
 echo ""
 echo -e "${YELLOW}Logging into Azure...${NC}"
@@ -94,6 +99,8 @@ gh secret set AZURE_SUBSCRIPTION_ID --body "$SUBSCRIPTION_ID"
 gh secret set MYSQL_ADMIN_PASSWORD --body "$MYSQL_PASSWORD"
 gh secret set DATABRICKS_TOKEN --body "$DATABRICKS_TOKEN"
 gh secret set DATABRICKS_WORKSPACE_URL --body "$DATABRICKS_WORKSPACE_URL"
+gh secret set DOCKER_HUB_USERNAME --body "$DOCKER_HUB_USERNAME"
+gh secret set DOCKER_HUB_TOKEN --body "$DOCKER_HUB_TOKEN"
 
 echo -e "${GREEN}✓ GitHub secrets configured${NC}"
 
@@ -185,6 +192,8 @@ echo "✓ AZURE_SUBSCRIPTION_ID"
 echo "✓ MYSQL_ADMIN_PASSWORD"
 echo "✓ DATABRICKS_TOKEN"
 echo "✓ DATABRICKS_WORKSPACE_URL"
+echo "✓ DOCKER_HUB_USERNAME"
+echo "✓ DOCKER_HUB_TOKEN"
 echo "✓ TF_STORAGE_ACCOUNT_NAME"
 echo "✓ TF_RESOURCE_GROUP_NAME"
 echo ""
