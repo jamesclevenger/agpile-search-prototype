@@ -92,6 +92,20 @@ resource "azurerm_storage_share" "mysql" {
   quota                = 10
 }
 
+# File Share for MySQL init scripts
+resource "azurerm_storage_share" "mysql_init" {
+  name                 = "mysql-init"
+  storage_account_name = azurerm_storage_account.mysql.name
+  quota                = 1
+}
+
+# Upload MySQL initialization script
+resource "azurerm_storage_share_file" "mysql_init_sql" {
+  name             = "init.sql"
+  storage_share_id = azurerm_storage_share.mysql_init.id
+  source           = "${path.module}/../docker/mysql/init.sql"
+}
+
 # Container Group for MySQL Service
 resource "azurerm_container_group" "mysql" {
   name                = "aci-unity-mysql-${var.environment}"
@@ -128,6 +142,14 @@ resource "azurerm_container_group" "mysql" {
       storage_account_key  = azurerm_storage_account.mysql.primary_access_key
       share_name           = azurerm_storage_share.mysql.name
     }
+
+    volume {
+      name                 = "mysql-init"
+      mount_path           = "/docker-entrypoint-initdb.d"
+      storage_account_name = azurerm_storage_account.mysql.name
+      storage_account_key  = azurerm_storage_account.mysql.primary_access_key
+      share_name           = azurerm_storage_share.mysql_init.name
+    }
   }
 
   image_registry_credential {
@@ -135,6 +157,10 @@ resource "azurerm_container_group" "mysql" {
     username = var.docker_hub_username
     password = var.docker_hub_token
   }
+
+  depends_on = [
+    azurerm_storage_share_file.mysql_init_sql
+  ]
 
   tags = {
     Environment = var.environment
@@ -269,7 +295,7 @@ resource "azurerm_container_group" "solr" {
       share_name           = azurerm_storage_share.solr.name
     }
 
-    commands = ["bash", "-c", "solr-precreate unity_catalog && solr-foreground"]
+    commands = ["solr-foreground", "-c"]
   }
 
   image_registry_credential {
