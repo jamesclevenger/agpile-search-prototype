@@ -305,7 +305,7 @@ jobs:
         
         # Show batch container logs
         echo "Getting batch container logs..."
-        az container logs --resource-group "$RG_NAME" --name "aci-unity-batch-${ENV}" --tail 50 || echo "Failed to get logs"
+        az container logs --resource-group "$RG_NAME" --name "aci-unity-batch-${ENV}" || echo "Failed to get logs"
         
         # Continue with normal check (but don't fail on batch)
         if ! check_container_status "aci-unity-batch-${ENV}" "Batch"; then
@@ -334,7 +334,7 @@ jobs:
             echo "Getting container details..."
             az container show --resource-group "$RG_NAME" --name "aci-unity-web-${ENV}" --query "containers[0].instanceView" -o json || echo "Failed to get container details"
             echo "Getting container logs..."
-            az container logs --resource-group "$RG_NAME" --name "aci-unity-web-${ENV}" --tail 50 || echo "Failed to get logs"
+            az container logs --resource-group "$RG_NAME" --name "aci-unity-web-${ENV}" || echo "Failed to get logs"
             exit 1
           fi
           
@@ -367,7 +367,7 @@ jobs:
               # Get recent container logs on failure
               if [[ $i -eq 1 ]] || [[ $i -eq 5 ]] || [[ $i -eq 10 ]]; then
                 echo "Getting recent container logs (attempt $i)..."
-                az container logs --resource-group "$RG_NAME" --name "aci-unity-web-${ENV}" --tail 20 || echo "Could not get logs"
+                az container logs --resource-group "$RG_NAME" --name "aci-unity-web-${ENV}" || echo "Could not get logs"
               fi
               
               if [[ "$i" -lt 15 ]]; then
@@ -384,7 +384,7 @@ jobs:
           
           if ! curl -f -s "http://${WEB_URL}:3000/api/health" > /dev/null; then
             echo "❌ Final health check failed - checking container logs..."
-            az container logs --resource-group "$RG_NAME" --name "aci-unity-web-${ENV}" --tail 50 || echo "Could not get web logs"
+            az container logs --resource-group "$RG_NAME" --name "aci-unity-web-${ENV}" || echo "Could not get web logs"
             exit 1
           fi
           

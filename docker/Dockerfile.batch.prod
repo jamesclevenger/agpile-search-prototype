@@ -44,6 +44,28 @@ RUN chmod 755 /var/spool/cron/crontabs
 HEALTHCHECK --interval=60s --timeout=30s --start-period=30s --retries=5 \
   CMD ps aux | grep -v grep | grep crond > /dev/null || exit 1
 
-# Start cron daemon and keep container running
-# Add logging and error handling
-CMD ["sh", "-c", "echo 'Starting batch service...' && crond -f -l 2 -L /var/log/cron.log"]
+# Create a startup script to check environment and start appropriately
+RUN cat > /usr/local/bin/start-batch.sh << 'EOF'
+#!/bin/sh
+echo "Starting batch service..."
+
+# Check if required environment variables are set
+if [ -z "$DATABRICKS_TOKEN" ] || [ -z "$DATABRICKS_WORKSPACE_URL" ]; then
+    echo "WARNING: Databricks credentials not configured"
+    echo "DATABRICKS_TOKEN: ${DATABRICKS_TOKEN:-'not set'}"
+    echo "DATABRICKS_WORKSPACE_URL: ${DATABRICKS_WORKSPACE_URL:-'not set'}"
+    echo "Running in minimal mode - cron daemon only (no indexing jobs will run)"
+fi
+
+# Create log directory
+mkdir -p /var/log
+
+# Start cron daemon in foreground with logging
+echo "Starting cron daemon..."
+exec crond -f -l 2 -L /var/log/cron.log
+EOF
+
+RUN chmod +x /usr/local/bin/start-batch.sh
+
+# Start using the startup script
+CMD ["/usr/local/bin/start-batch.sh"]

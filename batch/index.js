@@ -353,6 +353,15 @@ class UnityCatalogIndexer {
   async run() {
     console.log('Starting Unity Catalog indexing job...');
     
+    // Check for required credentials
+    if (!this.databricksToken || !this.databricksUrl) {
+      console.error('Missing required Databricks credentials:');
+      console.error('DATABRICKS_TOKEN:', this.databricksToken ? '[SET]' : '[NOT SET]');
+      console.error('DATABRICKS_WORKSPACE_URL:', this.databricksUrl ? '[SET]' : '[NOT SET]');
+      console.error('Cannot proceed without Databricks credentials. Exiting gracefully.');
+      process.exit(0); // Exit with success code since this is expected behavior
+    }
+    
     let jobId;
     try {
       // Create job record

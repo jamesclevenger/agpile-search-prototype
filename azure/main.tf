@@ -296,7 +296,7 @@ resource "azurerm_container_group" "solr" {
       share_name           = azurerm_storage_share.solr.name
     }
 
-    commands = ["bash", "-c", "solr-foreground & sleep 30 && solr create_core -c unity_catalog && wait"]
+    commands = ["bash", "-c", "echo 'Starting Solr...' && solr-foreground & SOLR_PID=$! && echo 'Waiting for Solr to be ready...' && sleep 30 && echo 'Creating unity_catalog core...' && solr create_core -c unity_catalog && echo 'Core created, keeping Solr running...' && wait $SOLR_PID"]
   }
 
   image_registry_credential {
