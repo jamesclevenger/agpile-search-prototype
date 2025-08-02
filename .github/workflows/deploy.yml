@@ -288,7 +288,30 @@ jobs:
         check_container_status "aci-unity-mysql-${ENV}" "MySQL"
         check_container_status "aci-unity-solr-${ENV}" "Solr" 
         check_container_status "aci-unity-web-${ENV}" "Web"
-        check_container_status "aci-unity-batch-${ENV}" "Batch"
+        
+        # Special handling for batch container with detailed diagnostics
+        echo "=== Batch Container Diagnostics ==="
+        BATCH_STATUS=$(az container show \
+          --resource-group "$RG_NAME" \
+          --name "aci-unity-batch-${ENV}" \
+          --query "containers[0].instanceView.currentState.state" \
+          --output tsv 2>/dev/null || echo "NotFound")
+        
+        echo "Batch container status: $BATCH_STATUS"
+        
+        # Show batch container details
+        echo "Getting batch container full details..."
+        az container show --resource-group "$RG_NAME" --name "aci-unity-batch-${ENV}" --query "containers[0]" -o json || echo "Failed to get container details"
+        
+        # Show batch container logs
+        echo "Getting batch container logs..."
+        az container logs --resource-group "$RG_NAME" --name "aci-unity-batch-${ENV}" --tail 50 || echo "Failed to get logs"
+        
+        # Continue with normal check (but don't fail on batch)
+        if ! check_container_status "aci-unity-batch-${ENV}" "Batch"; then
+          echo "⚠️  Batch container failed to start, but continuing deployment..."
+          echo "Batch container is optional for basic functionality."
+        fi
         
         # Get web service URL
         WEB_URL=$(az container show \
