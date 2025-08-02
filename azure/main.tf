@@ -207,16 +207,23 @@ resource "azurerm_container_group" "web" {
     }
   }
 
-  image_registry_credential {
-    server   = azurerm_container_registry.acr.login_server
-    username = azurerm_container_registry.acr.admin_username
-    password = azurerm_container_registry.acr.admin_password
+  # Use Docker Hub credentials for base images, ACR credentials for custom images
+  dynamic "image_registry_credential" {
+    for_each = contains(["nginx:alpine", "alpine:latest"], var.web_image) ? [1] : []
+    content {
+      server   = "index.docker.io"
+      username = var.docker_hub_username
+      password = var.docker_hub_token
+    }
   }
 
-  image_registry_credential {
-    server   = "index.docker.io"
-    username = var.docker_hub_username
-    password = var.docker_hub_token
+  dynamic "image_registry_credential" {
+    for_each = contains(["nginx:alpine", "alpine:latest"], var.web_image) ? [] : [1]
+    content {
+      server   = azurerm_container_registry.acr.login_server
+      username = azurerm_container_registry.acr.admin_username
+      password = azurerm_container_registry.acr.admin_password
+    }
   }
 
   depends_on = [
@@ -309,16 +316,23 @@ resource "azurerm_container_group" "batch" {
     }
   }
 
-  image_registry_credential {
-    server   = azurerm_container_registry.acr.login_server
-    username = azurerm_container_registry.acr.admin_username
-    password = azurerm_container_registry.acr.admin_password
+  # Use Docker Hub credentials for base images, ACR credentials for custom images
+  dynamic "image_registry_credential" {
+    for_each = contains(["nginx:alpine", "alpine:latest"], var.batch_image) ? [1] : []
+    content {
+      server   = "index.docker.io"
+      username = var.docker_hub_username
+      password = var.docker_hub_token
+    }
   }
 
-  image_registry_credential {
-    server   = "index.docker.io"
-    username = var.docker_hub_username
-    password = var.docker_hub_token
+  dynamic "image_registry_credential" {
+    for_each = contains(["nginx:alpine", "alpine:latest"], var.batch_image) ? [] : [1]
+    content {
+      server   = azurerm_container_registry.acr.login_server
+      username = azurerm_container_registry.acr.admin_username
+      password = azurerm_container_registry.acr.admin_password
+    }
   }
 
   depends_on = [
