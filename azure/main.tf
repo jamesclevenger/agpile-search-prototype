@@ -178,7 +178,7 @@ resource "azurerm_container_group" "main" {
       share_name           = azurerm_storage_share.solr.name
     }
 
-    commands = ["bash", "-c", "echo 'Preparing Solr environment...' && mkdir -p /var/solr/data && chown -R solr:solr /var/solr && echo 'Starting Solr...' && solr-foreground & SOLR_PID=$! && echo 'Waiting for Solr to be ready...' && sleep 45 && echo 'Creating unity_catalog core...' && solr create_core -c unity_catalog && echo 'Core created successfully' && wait $SOLR_PID"]
+    commands = ["bash", "-c", "echo 'Preparing Solr environment...' && mkdir -p /var/solr/data && chown -R solr:solr /var/solr && echo 'Starting Solr...' && solr-foreground & SOLR_PID=$! && echo 'Waiting for Solr to be ready...' && sleep 45 && echo 'Creating unity_catalog core...' && solr create_core -c unity_catalog && echo 'Adding Unity Catalog fields to schema...' && curl -X POST -H 'Content-type:application/json' --data-binary '{\"add-field\":[{\"name\":\"name\",\"type\":\"text_general\",\"indexed\":true,\"stored\":true},{\"name\":\"full_name\",\"type\":\"string\",\"indexed\":true,\"stored\":true},{\"name\":\"type\",\"type\":\"string\",\"indexed\":true,\"stored\":true},{\"name\":\"catalog_name\",\"type\":\"string\",\"indexed\":true,\"stored\":true},{\"name\":\"schema_name\",\"type\":\"string\",\"indexed\":true,\"stored\":true},{\"name\":\"description\",\"type\":\"text_general\",\"indexed\":true,\"stored\":true},{\"name\":\"owner\",\"type\":\"string\",\"indexed\":true,\"stored\":true}]}' http://localhost:8983/solr/unity_catalog/schema && echo 'Schema updated successfully' && wait $SOLR_PID"]
   }
 
   # Web Container
