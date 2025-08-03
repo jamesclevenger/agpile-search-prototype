@@ -286,6 +286,7 @@ resource "azurerm_container_group" "solr" {
 
     environment_variables = {
       SOLR_HEAP = "1g"
+      SOLR_HOME = "/var/solr/data"
     }
 
     volume {
@@ -296,7 +297,7 @@ resource "azurerm_container_group" "solr" {
       share_name           = azurerm_storage_share.solr.name
     }
 
-    commands = ["bash", "-c", "echo 'Starting Solr...' && solr-foreground & SOLR_PID=$! && echo 'Waiting for Solr to be ready...' && sleep 30 && echo 'Creating unity_catalog core...' && solr create_core -c unity_catalog && echo 'Core created, keeping Solr running...' && wait $SOLR_PID"]
+    commands = ["bash", "-c", "echo 'Preparing Solr environment...' && mkdir -p /var/solr/data && chown -R solr:solr /var/solr && echo 'Setting resource limits...' && ulimit -n 65000 && ulimit -u 65000 && echo 'Limits set - files: $(ulimit -n), processes: $(ulimit -u)' && echo 'Starting Solr...' && solr-foreground & SOLR_PID=$! && echo 'Waiting for Solr to be ready...' && sleep 30 && echo 'Creating unity_catalog core...' && solr create_core -c unity_catalog && echo 'Core created, keeping Solr running...' && wait $SOLR_PID"]
   }
 
   image_registry_credential {
