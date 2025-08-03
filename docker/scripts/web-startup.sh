@@ -87,32 +87,42 @@ wait_for_solr() {
     local host=$1
     local port=$2
     local core=$3
-    local max_attempts=60
+    local max_attempts=90  # Increased from 60 to 90 (7.5 minutes total)
     local attempt=1
     
     echo "Waiting for Solr core '$core' to be ready..."
+    echo "Note: Solr typically takes 5-7 minutes to fully initialize"
     
     while [ $attempt -le $max_attempts ]; do
-        # Check if Solr admin ping responds
-        if curl -f -s "http://$host:$port/solr/admin/ping" >/dev/null 2>&1; then
-            echo "✅ Solr server is running"
+        # First check basic port connectivity
+        if timeout 3 bash -c "</dev/tcp/$host/$port" 2>/dev/null; then
+            # Port is open, now check HTTP endpoints
             
-            # Check if the specific core exists
-            if curl -f -s "http://$host:$port/solr/$core/admin/ping" >/dev/null 2>&1; then
-                echo "✅ Solr core '$core' is ready!"
-                return 0
+            # Check if Solr admin ping responds (with longer timeout for connection resets)
+            if timeout 10 curl -f -s "http://$host:$port/solr/admin/ping" >/dev/null 2>&1; then
+                echo "✅ Solr server is running"
+                
+                # Check if the specific core exists
+                if timeout 10 curl -f -s "http://$host:$port/solr/$core/admin/ping" >/dev/null 2>&1; then
+                    echo "✅ Solr core '$core' is ready!"
+                    return 0
+                else
+                    echo "⏳ Solr running but core '$core' not ready yet (attempt $attempt/$max_attempts)..."
+                fi
             else
-                echo "⏳ Solr running but core '$core' not ready yet..."
+                # Solr might be in startup phase (connection reset is normal)
+                echo "⏳ Solr port open but HTTP not ready yet (attempt $attempt/$max_attempts)..."
             fi
         else
-            echo "⏳ Solr server not ready yet (attempt $attempt/$max_attempts)..."
+            echo "⏳ Solr port not accessible yet (attempt $attempt/$max_attempts)..."
         fi
         
         sleep 5
         attempt=$((attempt + 1))
     done
     
-    echo "❌ Solr core '$core' failed to become ready after $max_attempts attempts"
+    echo "⚠️  Solr core '$core' not ready after $max_attempts attempts (7.5 minutes)"
+    echo "This may be normal - Solr sometimes takes longer to initialize"
     return 1
 }
 

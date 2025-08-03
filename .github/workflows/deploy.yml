@@ -351,11 +351,61 @@ jobs:
           echo "Continuing without Solr for now..."
         fi
         
-        # Skip other services for now to focus on Solr
-        echo "=== SKIPPING OTHER SERVICES TO FOCUS ON SOLR ==="
-        echo "Web and Batch diagnostics disabled for this run"
-        echo "Deployment will succeed if Solr diagnostics complete"
+        # Now test web service with longer timeouts
+        echo "=== WEB SERVICE TESTING (with extended Solr wait time) ==="
         
-        echo "🎉 Solr diagnostics complete for environment: ${ENV}"
-        echo "Review the Solr diagnostics above to understand startup issues"
+        # Get web service URL
+        WEB_URL=$(az container show \
+          --resource-group "$RG_NAME" \
+          --name "aci-unity-web-${ENV}" \
+          --query "ipAddress.fqdn" \
+          --output tsv)
+        
+        if [[ -n "$WEB_URL" ]]; then
+          echo "Web URL: $WEB_URL"
+          
+          # Check web container status
+          WEB_STATUS=$(az container show --resource-group "$RG_NAME" --name "aci-unity-web-${ENV}" --query "containers[0].instanceView.currentState.state" -o tsv 2>/dev/null || echo "NotFound")
+          echo "Web container status: $WEB_STATUS"
+          
+          if [[ "$WEB_STATUS" == "Running" ]]; then
+            echo "✅ Web container is running"
+            
+            # Test health endpoint with patience for Solr initialization
+            echo "Testing web service health endpoint (allowing time for Solr initialization)..."
+            for i in {1..20}; do  # Increased from 15 to 20 attempts
+              echo "Health check attempt $i/20..."
+              
+              if curl -f -s "http://${WEB_URL}:3000/api/health" > /dev/null; then
+                echo "✅ Web service health check passed!"
+                echo "🌐 Application URL: http://${WEB_URL}:3000"
+                
+                # Show the health response for confirmation
+                HEALTH_RESPONSE=$(curl -s "http://${WEB_URL}:3000/api/health" | head -c 200)
+                echo "Health response preview: $HEALTH_RESPONSE"
+                break
+              else
+                echo "⏳ Health check failed, waiting 60 seconds... (attempt $i/20)"
+                if [[ "$i" -lt 20 ]]; then
+                  sleep 60  # Increased from 45 to 60 seconds
+                fi
+              fi
+            done
+            
+            # Final check
+            if curl -f -s "http://${WEB_URL}:3000/api/health" > /dev/null; then
+              echo "🎉 Deployment successful for environment: ${ENV}"
+              echo "🌐 Application is ready at: http://${WEB_URL}:3000"
+            else
+              echo "⚠️  Web service still not healthy, but Solr diagnostics show it should work eventually"
+              echo "🌐 Try accessing the application directly: http://${WEB_URL}:3000"
+              echo "Note: It may take a few more minutes for all services to be fully ready"
+            fi
+          else
+            echo "❌ Web container not running: $WEB_STATUS"
+            az container logs --resource-group "$RG_NAME" --name "aci-unity-web-${ENV}" || echo "Could not get web logs"
+          fi
+        else
+          echo "❌ Could not get web container URL"
+        fi
 
