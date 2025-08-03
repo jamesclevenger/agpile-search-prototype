@@ -72,6 +72,7 @@ jobs:
         TF_VAR_databricks_workspace_url: ${{ secrets.DATABRICKS_WORKSPACE_URL }}
         TF_VAR_docker_hub_username: ${{ secrets.DOCKER_HUB_USERNAME }}
         TF_VAR_docker_hub_token: ${{ secrets.DOCKER_HUB_TOKEN }}
+        TF_VAR_admin_email: ${{ secrets.ADMIN_EMAIL }}
 
     - name: Get Terraform Outputs
       id: terraform-output
@@ -252,6 +253,7 @@ jobs:
         TF_VAR_databricks_workspace_url: ${{ secrets.DATABRICKS_WORKSPACE_URL }}
         TF_VAR_docker_hub_username: ${{ secrets.DOCKER_HUB_USERNAME }}
         TF_VAR_docker_hub_token: ${{ secrets.DOCKER_HUB_TOKEN }}
+        TF_VAR_admin_email: ${{ secrets.ADMIN_EMAIL }}
 
     - name: Run Health Checks
       run: |

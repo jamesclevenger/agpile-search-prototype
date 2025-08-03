@@ -46,7 +46,7 @@ resource "azurerm_monitor_action_group" "main" {
 resource "azurerm_monitor_metric_alert" "web_availability" {
   name                = "alert-web-availability-${var.environment}"
   resource_group_name = azurerm_resource_group.main.name
-  scopes              = [azurerm_container_group.web.id]
+  scopes              = [azurerm_container_group.main.id]
   description         = "Web service availability alert"
 
   criteria {
@@ -94,7 +94,7 @@ resource "azurerm_portal_dashboard" "main" {
                   metrics = [
                     {
                       resourceMetadata = {
-                        id = azurerm_container_group.web.id
+                        id = azurerm_container_group.main.id
                       }
                       name = "CpuUsage"
                       aggregationType = "Average"
@@ -121,7 +121,7 @@ resource "azurerm_portal_dashboard" "main" {
                   metrics = [
                     {
                       resourceMetadata = {
-                        id = azurerm_container_group.web.id
+                        id = azurerm_container_group.main.id
                       }
                       name = "MemoryUsage"
                       aggregationType = "Average"
