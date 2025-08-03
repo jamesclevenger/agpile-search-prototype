@@ -94,6 +94,42 @@ jobs:
           echo "Monitor action group already in Terraform state"
         fi
         
+        # Import Container Group
+        if ! terraform state show azurerm_container_group.main >/dev/null 2>&1; then
+          echo "Importing existing container group..."
+          terraform import azurerm_container_group.main "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.ContainerInstance/containerGroups/aci-unity-catalog-${ENV}" || echo "Container group import failed"
+        else
+          echo "Container group already in Terraform state"
+        fi
+        
+        # Import Application Insights
+        if ! terraform state show azurerm_application_insights.main >/dev/null 2>&1; then
+          echo "Importing existing application insights..."
+          terraform import azurerm_application_insights.main "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.Insights/components/appi-unity-catalog-${ENV}" || echo "Application insights import failed"
+        else
+          echo "Application insights already in Terraform state"
+        fi
+        
+        # Import Metric Alert
+        if ! terraform state show azurerm_monitor_metric_alert.web_availability >/dev/null 2>&1; then
+          echo "Importing existing metric alert..."
+          terraform import azurerm_monitor_metric_alert.web_availability "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.Insights/metricAlerts/alert-web-availability-${ENV}" || echo "Metric alert import failed"
+        else
+          echo "Metric alert already in Terraform state"
+        fi
+        
+        # Import Portal Dashboard
+        if ! terraform state show azurerm_portal_dashboard.main >/dev/null 2>&1; then
+          echo "Importing existing portal dashboard..."
+          terraform import azurerm_portal_dashboard.main "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.Portal/dashboards/dashboard-unity-catalog-${ENV}" || echo "Portal dashboard import failed"
+        else
+          echo "Portal dashboard already in Terraform state"
+        fi
+        
+        # Note: Storage accounts with random suffixes and file shares are harder to predict
+        # They will likely need manual import if they exist, but we'll try common patterns
+        echo "Note: Storage accounts and file shares may need manual import if they exist with random suffixes"
+        
         terraform plan -out=tfplan
         terraform apply -auto-approve tfplan
       env:
@@ -307,6 +343,42 @@ jobs:
         else
           echo "Monitor action group already in Terraform state"
         fi
+        
+        # Import Container Group
+        if ! terraform state show azurerm_container_group.main >/dev/null 2>&1; then
+          echo "Importing existing container group..."
+          terraform import azurerm_container_group.main "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.ContainerInstance/containerGroups/aci-unity-catalog-${{ needs.deploy-infrastructure.outputs.environment }}" || echo "Container group import failed"
+        else
+          echo "Container group already in Terraform state"
+        fi
+        
+        # Import Application Insights
+        if ! terraform state show azurerm_application_insights.main >/dev/null 2>&1; then
+          echo "Importing existing application insights..."
+          terraform import azurerm_application_insights.main "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.Insights/components/appi-unity-catalog-${{ needs.deploy-infrastructure.outputs.environment }}" || echo "Application insights import failed"
+        else
+          echo "Application insights already in Terraform state"
+        fi
+        
+        # Import Metric Alert
+        if ! terraform state show azurerm_monitor_metric_alert.web_availability >/dev/null 2>&1; then
+          echo "Importing existing metric alert..."
+          terraform import azurerm_monitor_metric_alert.web_availability "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.Insights/metricAlerts/alert-web-availability-${{ needs.deploy-infrastructure.outputs.environment }}" || echo "Metric alert import failed"
+        else
+          echo "Metric alert already in Terraform state"
+        fi
+        
+        # Import Portal Dashboard
+        if ! terraform state show azurerm_portal_dashboard.main >/dev/null 2>&1; then
+          echo "Importing existing portal dashboard..."
+          terraform import azurerm_portal_dashboard.main "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.Portal/dashboards/dashboard-unity-catalog-${{ needs.deploy-infrastructure.outputs.environment }}" || echo "Portal dashboard import failed"
+        else
+          echo "Portal dashboard already in Terraform state"
+        fi
+        
+        # Note: Storage accounts with random suffixes and file shares are harder to predict
+        # They will likely need manual import if they exist, but we'll try common patterns
+        echo "Note: Storage accounts and file shares may need manual import if they exist with random suffixes"
         
         # Update Terraform variables to use actual images with unique tags to force replacement
         export TF_VAR_web_image="${ACR_NAME}.azurecr.io/unity-catalog-web:${{ github.sha }}"
