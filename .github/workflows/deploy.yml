@@ -56,15 +56,42 @@ jobs:
           -backend-config="key=terraform.tfstate"
         terraform workspace select ${{ steps.set-env.outputs.environment }} || terraform workspace new ${{ steps.set-env.outputs.environment }}
         
-        # Import existing resource group if not already in state (fix state drift)
-        echo "Checking if resource group needs to be imported..."
+        # Import existing resources if not already in state (fix state drift)
+        echo "Checking if resources need to be imported..."
         ENV="${{ steps.set-env.outputs.environment }}"
         RG_NAME="${{ env.AZURE_RESOURCE_GROUP }}-${ENV}"
+        SUBSCRIPTION_ID="${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}"
+        
+        # Import Resource Group
         if ! terraform state show azurerm_resource_group.main >/dev/null 2>&1; then
-          echo "Importing existing resource group into Terraform state..."
-          terraform import azurerm_resource_group.main "/subscriptions/${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}/resourceGroups/${RG_NAME}" || echo "Import failed or resource group doesn't exist"
+          echo "Importing existing resource group..."
+          terraform import azurerm_resource_group.main "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}" || echo "Resource group import failed"
         else
           echo "Resource group already in Terraform state"
+        fi
+        
+        # Import Container Registry
+        if ! terraform state show azurerm_container_registry.acr >/dev/null 2>&1; then
+          echo "Importing existing container registry..."
+          terraform import azurerm_container_registry.acr "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.ContainerRegistry/registries/${{ env.ACR_NAME }}${ENV}" || echo "Container registry import failed"
+        else
+          echo "Container registry already in Terraform state"
+        fi
+        
+        # Import Log Analytics Workspace
+        if ! terraform state show azurerm_log_analytics_workspace.main >/dev/null 2>&1; then
+          echo "Importing existing log analytics workspace..."
+          terraform import azurerm_log_analytics_workspace.main "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.OperationalInsights/workspaces/log-unity-catalog-${ENV}" || echo "Log analytics workspace import failed"
+        else
+          echo "Log analytics workspace already in Terraform state"
+        fi
+        
+        # Import Monitor Action Group
+        if ! terraform state show azurerm_monitor_action_group.main >/dev/null 2>&1; then
+          echo "Importing existing monitor action group..."
+          terraform import azurerm_monitor_action_group.main "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.Insights/actionGroups/ag-unity-catalog-${ENV}" || echo "Monitor action group import failed"
+        else
+          echo "Monitor action group already in Terraform state"
         fi
         
         terraform plan -out=tfplan
@@ -245,13 +272,40 @@ jobs:
         # Select workspace
         terraform workspace select ${{ needs.deploy-infrastructure.outputs.environment }} || terraform workspace new ${{ needs.deploy-infrastructure.outputs.environment }}
         
-        # Import existing resource group if not already in state (fix state drift)
-        echo "Checking if resource group needs to be imported..."
+        # Import existing resources if not already in state (fix state drift)
+        echo "Checking if resources need to be imported..."
+        SUBSCRIPTION_ID="${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}"
+        
+        # Import Resource Group
         if ! terraform state show azurerm_resource_group.main >/dev/null 2>&1; then
-          echo "Importing existing resource group into Terraform state..."
-          terraform import azurerm_resource_group.main "/subscriptions/${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}/resourceGroups/${RG_NAME}" || echo "Import failed or resource group doesn't exist"
+          echo "Importing existing resource group..."
+          terraform import azurerm_resource_group.main "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}" || echo "Resource group import failed"
         else
           echo "Resource group already in Terraform state"
+        fi
+        
+        # Import Container Registry
+        if ! terraform state show azurerm_container_registry.acr >/dev/null 2>&1; then
+          echo "Importing existing container registry..."
+          terraform import azurerm_container_registry.acr "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.ContainerRegistry/registries/${ACR_NAME}" || echo "Container registry import failed"
+        else
+          echo "Container registry already in Terraform state"
+        fi
+        
+        # Import Log Analytics Workspace
+        if ! terraform state show azurerm_log_analytics_workspace.main >/dev/null 2>&1; then
+          echo "Importing existing log analytics workspace..."
+          terraform import azurerm_log_analytics_workspace.main "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.OperationalInsights/workspaces/log-unity-catalog-${{ needs.deploy-infrastructure.outputs.environment }}" || echo "Log analytics workspace import failed"
+        else
+          echo "Log analytics workspace already in Terraform state"
+        fi
+        
+        # Import Monitor Action Group
+        if ! terraform state show azurerm_monitor_action_group.main >/dev/null 2>&1; then
+          echo "Importing existing monitor action group..."
+          terraform import azurerm_monitor_action_group.main "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.Insights/actionGroups/ag-unity-catalog-${{ needs.deploy-infrastructure.outputs.environment }}" || echo "Monitor action group import failed"
+        else
+          echo "Monitor action group already in Terraform state"
         fi
         
         # Update Terraform variables to use actual images with unique tags to force replacement
