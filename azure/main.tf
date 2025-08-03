@@ -194,19 +194,23 @@ resource "azurerm_container_group" "main" {
     }
 
     environment_variables = {
-      MYSQL_HOST   = "localhost"  # Changed from FQDN to localhost
-      MYSQL_PORT   = "3306"
-      MYSQL_USER   = "unityadmin"
-      MYSQL_DB     = "unity_catalog"
-      SOLR_HOST    = "localhost"  # Changed from FQDN to localhost
-      SOLR_PORT    = "8983"
-      SOLR_CORE    = "unity_catalog"
-      NEXTAUTH_URL = "https://unity-catalog-${var.environment}.westus2.azurecontainer.io"
+      MYSQL_HOST                    = "localhost"  # Changed from FQDN to localhost
+      MYSQL_PORT                    = "3306"
+      MYSQL_USER                    = "unityadmin"
+      MYSQL_DB                      = "unity_catalog"
+      SOLR_HOST                     = "localhost"  # Changed from FQDN to localhost
+      SOLR_PORT                     = "8983"
+      SOLR_CORE                     = "unity_catalog"
+      NEXTAUTH_URL                  = "https://unity-catalog-${var.environment}.westus2.azurecontainer.io"
+      AZURE_OPENAI_ENDPOINT         = var.azure_openai_endpoint
+      AZURE_OPENAI_DEPLOYMENT_NAME  = var.azure_openai_deployment_name
+      AZURE_OPENAI_API_VERSION      = var.azure_openai_api_version
     }
 
     secure_environment_variables = {
-      MYSQL_PASSWORD  = var.mysql_admin_password
-      NEXTAUTH_SECRET = random_string.nextauth_secret.result
+      MYSQL_PASSWORD       = var.mysql_admin_password
+      NEXTAUTH_SECRET      = random_string.nextauth_secret.result
+      AZURE_OPENAI_API_KEY = var.azure_openai_api_key
     }
   }
 
@@ -301,6 +305,28 @@ variable "docker_hub_token" {
   description = "Docker Hub personal access token"
   type        = string
   sensitive   = true
+}
+
+variable "azure_openai_api_key" {
+  description = "Azure OpenAI API key"
+  type        = string
+  sensitive   = true
+}
+
+variable "azure_openai_endpoint" {
+  description = "Azure OpenAI endpoint URL"
+  type        = string
+}
+
+variable "azure_openai_deployment_name" {
+  description = "Azure OpenAI deployment name"
+  type        = string
+}
+
+variable "azure_openai_api_version" {
+  description = "Azure OpenAI API version"
+  type        = string
+  default     = "2024-02-01"
 }
 
 # Random secret for NextAuth

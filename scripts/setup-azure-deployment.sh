@@ -59,6 +59,20 @@ read -p "Docker Hub Username: " DOCKER_HUB_USERNAME
 read -s -p "Docker Hub Personal Access Token: " DOCKER_HUB_TOKEN
 echo ""
 
+read -p "Admin Email (for monitoring alerts): " ADMIN_EMAIL
+
+echo ""
+echo -e "${YELLOW}Azure OpenAI Configuration (for chat features):${NC}"
+read -s -p "Azure OpenAI API Key: " AZURE_OPENAI_API_KEY
+echo ""
+
+read -p "Azure OpenAI Endpoint (e.g., https://your-resource.openai.azure.com): " AZURE_OPENAI_ENDPOINT
+
+read -p "Azure OpenAI Deployment Name: " AZURE_OPENAI_DEPLOYMENT_NAME
+
+read -p "Azure OpenAI API Version (default: 2024-02-01): " AZURE_OPENAI_API_VERSION
+AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-"2024-02-01"}
+
 # Azure login and setup
 echo ""
 echo -e "${YELLOW}Logging into Azure...${NC}"
@@ -101,6 +115,11 @@ gh secret set DATABRICKS_TOKEN --body "$DATABRICKS_TOKEN"
 gh secret set DATABRICKS_WORKSPACE_URL --body "$DATABRICKS_WORKSPACE_URL"
 gh secret set DOCKER_HUB_USERNAME --body "$DOCKER_HUB_USERNAME"
 gh secret set DOCKER_HUB_TOKEN --body "$DOCKER_HUB_TOKEN"
+gh secret set ADMIN_EMAIL --body "$ADMIN_EMAIL"
+gh secret set AZURE_OPENAI_API_KEY --body "$AZURE_OPENAI_API_KEY"
+gh secret set AZURE_OPENAI_ENDPOINT --body "$AZURE_OPENAI_ENDPOINT"
+gh secret set AZURE_OPENAI_DEPLOYMENT_NAME --body "$AZURE_OPENAI_DEPLOYMENT_NAME"
+gh secret set AZURE_OPENAI_API_VERSION --body "$AZURE_OPENAI_API_VERSION"
 
 echo -e "${GREEN}✓ GitHub secrets configured${NC}"
 
@@ -194,6 +213,11 @@ echo "✓ DATABRICKS_TOKEN"
 echo "✓ DATABRICKS_WORKSPACE_URL"
 echo "✓ DOCKER_HUB_USERNAME"
 echo "✓ DOCKER_HUB_TOKEN"
+echo "✓ ADMIN_EMAIL"
+echo "✓ AZURE_OPENAI_API_KEY"
+echo "✓ AZURE_OPENAI_ENDPOINT"
+echo "✓ AZURE_OPENAI_DEPLOYMENT_NAME"
+echo "✓ AZURE_OPENAI_API_VERSION"
 echo "✓ TF_STORAGE_ACCOUNT_NAME"
 echo "✓ TF_RESOURCE_GROUP_NAME"
 echo ""
