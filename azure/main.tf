@@ -106,15 +106,16 @@ resource "azurerm_storage_share_file" "mysql_init_sql" {
   source           = "${path.module}/../docker/mysql/init.sql"
 }
 
-# Container Group for MySQL Service
-resource "azurerm_container_group" "mysql" {
-  name                = "aci-unity-mysql-${var.environment}"
+# Single Container Group for All Services
+resource "azurerm_container_group" "main" {
+  name                = "aci-unity-catalog-${var.environment}"
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
   ip_address_type     = "Public"
-  dns_name_label      = "unity-catalog-mysql-${var.environment}"
+  dns_name_label      = "unity-catalog-${var.environment}"
   os_type             = "Linux"
 
+  # MySQL Container
   container {
     name   = "mysql"
     image  = "mysql:8.0"
@@ -152,10 +153,77 @@ resource "azurerm_container_group" "mysql" {
     }
   }
 
+  # Solr Container
+  container {
+    name   = "solr"
+    image  = "solr:9.6"
+    cpu    = "1"
+    memory = "2"
+
+    ports {
+      port     = 8983
+      protocol = "TCP"
+    }
+
+    environment_variables = {
+      SOLR_HEAP = "1g"
+      SOLR_HOME = "/var/solr/data"
+    }
+
+    volume {
+      name                 = "solr-data"
+      mount_path           = "/var/solr"
+      storage_account_name = azurerm_storage_account.solr.name
+      storage_account_key  = azurerm_storage_account.solr.primary_access_key
+      share_name           = azurerm_storage_share.solr.name
+    }
+
+    commands = ["bash", "-c", "echo 'Preparing Solr environment...' && mkdir -p /var/solr/data && chown -R solr:solr /var/solr && echo 'Setting resource limits...' && ulimit -n 65000 && ulimit -u 65000 && echo 'Limits set - files: $(ulimit -n), processes: $(ulimit -u)' && echo 'Starting Solr...' && solr-foreground & SOLR_PID=$! && echo 'Waiting for Solr to be ready...' && sleep 30 && echo 'Creating unity_catalog core...' && solr create_core -c unity_catalog && echo 'Core created, keeping Solr running...' && wait $SOLR_PID"]
+  }
+
+  # Web Container
+  container {
+    name   = "web"
+    image  = var.web_image
+    cpu    = "1"
+    memory = "2"
+
+    ports {
+      port     = 3000
+      protocol = "TCP"
+    }
+
+    environment_variables = {
+      MYSQL_HOST   = "localhost"  # Changed from FQDN to localhost
+      MYSQL_PORT   = "3306"
+      MYSQL_USER   = "unityadmin"
+      MYSQL_DB     = "unity_catalog"
+      SOLR_HOST    = "localhost"  # Changed from FQDN to localhost
+      SOLR_PORT    = "8983"
+      SOLR_CORE    = "unity_catalog"
+      NEXTAUTH_URL = "https://unity-catalog-${var.environment}.westus2.azurecontainer.io"
+    }
+
+    secure_environment_variables = {
+      MYSQL_PASSWORD  = var.mysql_admin_password
+      NEXTAUTH_SECRET = random_string.nextauth_secret.result
+    }
+  }
+
+  # Registry credentials for Docker Hub and ACR
   image_registry_credential {
     server   = "index.docker.io"
     username = var.docker_hub_username
     password = var.docker_hub_token
+  }
+
+  dynamic "image_registry_credential" {
+    for_each = can(regex("\\.azurecr\\.io/", var.web_image)) ? [1] : []
+    content {
+      server   = azurerm_container_registry.acr.login_server
+      username = azurerm_container_registry.acr.admin_username
+      password = azurerm_container_registry.acr.admin_password
+    }
   }
 
   depends_on = [
@@ -198,182 +266,6 @@ resource "random_string" "suffix" {
 }
 
 # Container Group for Web Service
-resource "azurerm_container_group" "web" {
-  name                = "aci-unity-web-${var.environment}"
-  location            = azurerm_resource_group.main.location
-  resource_group_name = azurerm_resource_group.main.name
-  ip_address_type     = "Public"
-  dns_name_label      = "unity-catalog-web-${var.environment}"
-  os_type             = "Linux"
-
-  container {
-    name   = "web"
-    image  = var.web_image
-    cpu    = "1"
-    memory = "2"
-
-    ports {
-      port     = 3000
-      protocol = "TCP"
-    }
-
-    environment_variables = {
-      MYSQL_HOST   = azurerm_container_group.mysql.fqdn
-      MYSQL_PORT   = "3306"
-      MYSQL_USER   = "unityadmin"
-      MYSQL_DB     = "unity_catalog"
-      SOLR_HOST    = azurerm_container_group.solr.fqdn
-      SOLR_PORT    = "8983"
-      SOLR_CORE    = "unity_catalog"
-      NEXTAUTH_URL = "https://unity-catalog-web-${var.environment}.westus2.azurecontainer.io"
-    }
-
-    secure_environment_variables = {
-      MYSQL_PASSWORD  = var.mysql_admin_password
-      NEXTAUTH_SECRET = random_string.nextauth_secret.result
-    }
-  }
-
-  # Use Docker Hub credentials for base images, ACR credentials for ACR images
-  dynamic "image_registry_credential" {
-    for_each = contains(["nginx:alpine", "alpine:latest"], var.web_image) ? [1] : []
-    content {
-      server   = "index.docker.io"
-      username = var.docker_hub_username
-      password = var.docker_hub_token
-    }
-  }
-
-  dynamic "image_registry_credential" {
-    for_each = can(regex("\\.azurecr\\.io/", var.web_image)) ? [1] : []
-    content {
-      server   = azurerm_container_registry.acr.login_server
-      username = azurerm_container_registry.acr.admin_username
-      password = azurerm_container_registry.acr.admin_password
-    }
-  }
-
-  depends_on = [
-    azurerm_container_group.mysql,
-    azurerm_container_group.solr
-  ]
-
-  tags = {
-    Environment = var.environment
-    Project     = "unity-catalog-search"
-  }
-}
-
-# Container Group for Solr Service
-resource "azurerm_container_group" "solr" {
-  name                = "aci-unity-solr-${var.environment}"
-  location            = azurerm_resource_group.main.location
-  resource_group_name = azurerm_resource_group.main.name
-  ip_address_type     = "Public"
-  dns_name_label      = "unity-catalog-solr-${var.environment}"
-  os_type             = "Linux"
-
-  container {
-    name   = "solr"
-    image  = "solr:9.6"
-    cpu    = "1"
-    memory = "2"
-
-    ports {
-      port     = 8983
-      protocol = "TCP"
-    }
-
-    environment_variables = {
-      SOLR_HEAP = "1g"
-      SOLR_HOME = "/var/solr/data"
-    }
-
-    volume {
-      name                 = "solr-data"
-      mount_path           = "/var/solr"
-      storage_account_name = azurerm_storage_account.solr.name
-      storage_account_key  = azurerm_storage_account.solr.primary_access_key
-      share_name           = azurerm_storage_share.solr.name
-    }
-
-    commands = ["bash", "-c", "echo 'Preparing Solr environment...' && mkdir -p /var/solr/data && chown -R solr:solr /var/solr && echo 'Setting resource limits...' && ulimit -n 65000 && ulimit -u 65000 && echo 'Limits set - files: $(ulimit -n), processes: $(ulimit -u)' && echo 'Starting Solr...' && solr-foreground & SOLR_PID=$! && echo 'Waiting for Solr to be ready...' && sleep 30 && echo 'Creating unity_catalog core...' && solr create_core -c unity_catalog && echo 'Core created, keeping Solr running...' && wait $SOLR_PID"]
-  }
-
-  image_registry_credential {
-    server   = "index.docker.io"
-    username = var.docker_hub_username
-    password = var.docker_hub_token
-  }
-
-
-  tags = {
-    Environment = var.environment
-    Project     = "unity-catalog-search"
-  }
-}
-
-# Container Group for Batch Service
-resource "azurerm_container_group" "batch" {
-  name                = "aci-unity-batch-${var.environment}"
-  location            = azurerm_resource_group.main.location
-  resource_group_name = azurerm_resource_group.main.name
-  ip_address_type     = "None"
-  os_type             = "Linux"
-  restart_policy      = "OnFailure"
-
-  container {
-    name   = "batch"
-    image  = var.batch_image
-    cpu    = "0.5"
-    memory = "1"
-
-    environment_variables = {
-      MYSQL_HOST = azurerm_container_group.mysql.fqdn
-      MYSQL_PORT = "3306"
-      MYSQL_USER = "unityadmin"
-      MYSQL_DB   = "unity_catalog"
-      SOLR_HOST  = azurerm_container_group.solr.fqdn
-      SOLR_PORT  = "8983"
-      SOLR_CORE  = "unity_catalog"
-    }
-
-    secure_environment_variables = {
-      MYSQL_PASSWORD           = var.mysql_admin_password
-      DATABRICKS_TOKEN         = var.databricks_token
-      DATABRICKS_WORKSPACE_URL = var.databricks_workspace_url
-    }
-  }
-
-  # Use Docker Hub credentials for base images, ACR credentials for ACR images
-  dynamic "image_registry_credential" {
-    for_each = contains(["nginx:alpine", "alpine:latest"], var.batch_image) ? [1] : []
-    content {
-      server   = "index.docker.io"
-      username = var.docker_hub_username
-      password = var.docker_hub_token
-    }
-  }
-
-  dynamic "image_registry_credential" {
-    for_each = can(regex("\\.azurecr\\.io/", var.batch_image)) ? [1] : []
-    content {
-      server   = azurerm_container_registry.acr.login_server
-      username = azurerm_container_registry.acr.admin_username
-      password = azurerm_container_registry.acr.admin_password
-    }
-  }
-
-  depends_on = [
-    azurerm_container_group.mysql,
-    azurerm_container_group.solr
-  ]
-
-  tags = {
-    Environment = var.environment
-    Project     = "unity-catalog-search"
-  }
-}
 
 # Additional variables for batch service
 variable "databricks_token" {
@@ -436,9 +328,9 @@ output "container_registry_admin_password" {
 }
 
 output "web_app_url" {
-  value = "https://${azurerm_container_group.web.fqdn}:3000"
+  value = "https://${azurerm_container_group.main.fqdn}:3000"
 }
 
 output "mysql_server_fqdn" {
-  value = azurerm_container_group.mysql.fqdn
+  value = azurerm_container_group.main.fqdn
 }

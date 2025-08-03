@@ -284,31 +284,31 @@ jobs:
           return 1
         }
         
-        # Check all services
-        check_container_status "aci-unity-mysql-${ENV}" "MySQL"
+        # Check all services (now in single container group)
+        check_container_status "aci-unity-catalog-${ENV}" "Main Container Group"
         
         # Detailed Solr diagnostics
         echo "=== DETAILED SOLR DIAGNOSTICS ==="
         SOLR_STATUS=$(az container show \
           --resource-group "$RG_NAME" \
-          --name "aci-unity-solr-${ENV}" \
-          --query "containers[0].instanceView.currentState.state" \
+          --name "aci-unity-catalog-${ENV}" \
+          --query "containers[1].instanceView.currentState.state" \
           --output tsv 2>/dev/null || echo "NotFound")
         
         echo "Solr container status: $SOLR_STATUS"
         
         # Get Solr container full details
         echo "=== Solr Container Configuration ==="
-        az container show --resource-group "$RG_NAME" --name "aci-unity-solr-${ENV}" --query "containers[0]" -o json || echo "Failed to get container config"
+        az container show --resource-group "$RG_NAME" --name "aci-unity-catalog-${ENV}" --query "containers[1]" -o json || echo "Failed to get container config"
         
         # Get Solr container logs
         echo "=== Solr Container Logs ==="
-        az container logs --resource-group "$RG_NAME" --name "aci-unity-solr-${ENV}" || echo "Failed to get Solr logs"
+        az container logs --resource-group "$RG_NAME" --name "aci-unity-catalog-${ENV}" --container-name "solr" || echo "Failed to get Solr logs"
         
         # Get Solr network details
         echo "=== Solr Network Details ==="
-        SOLR_FQDN=$(az container show --resource-group "$RG_NAME" --name "aci-unity-solr-${ENV}" --query "ipAddress.fqdn" -o tsv || echo "None")
-        SOLR_IP=$(az container show --resource-group "$RG_NAME" --name "aci-unity-solr-${ENV}" --query "ipAddress.ip" -o tsv || echo "None")
+        SOLR_FQDN=$(az container show --resource-group "$RG_NAME" --name "aci-unity-catalog-${ENV}" --query "ipAddress.fqdn" -o tsv || echo "None")
+        SOLR_IP=$(az container show --resource-group "$RG_NAME" --name "aci-unity-catalog-${ENV}" --query "ipAddress.ip" -o tsv || echo "None")
         echo "Solr FQDN: $SOLR_FQDN"
         echo "Solr IP: $SOLR_IP"
         
@@ -345,11 +345,8 @@ jobs:
           echo "System status response: $STATUS_RESPONSE"
         fi
         
-        # Continue with regular check but don't fail on Solr yet
-        if ! check_container_status "aci-unity-solr-${ENV}" "Solr"; then
-          echo "❌ Solr failed status check - see diagnostics above"
-          echo "Continuing without Solr for now..."
-        fi
+        # Skip individual container checks since they're all in one group now
+        echo "All containers are in single container group: aci-unity-catalog-${ENV}"
         
         # Now test web service with longer timeouts
         echo "=== WEB SERVICE TESTING (with extended Solr wait time) ==="
@@ -357,15 +354,15 @@ jobs:
         # Get web service URL
         WEB_URL=$(az container show \
           --resource-group "$RG_NAME" \
-          --name "aci-unity-web-${ENV}" \
+          --name "aci-unity-catalog-${ENV}" \
           --query "ipAddress.fqdn" \
           --output tsv)
         
         if [[ -n "$WEB_URL" ]]; then
           echo "Web URL: $WEB_URL"
           
-          # Check web container status
-          WEB_STATUS=$(az container show --resource-group "$RG_NAME" --name "aci-unity-web-${ENV}" --query "containers[0].instanceView.currentState.state" -o tsv 2>/dev/null || echo "NotFound")
+          # Check web container status (container index 2 for web)
+          WEB_STATUS=$(az container show --resource-group "$RG_NAME" --name "aci-unity-catalog-${ENV}" --query "containers[2].instanceView.currentState.state" -o tsv 2>/dev/null || echo "NotFound")
           echo "Web container status: $WEB_STATUS"
           
           if [[ "$WEB_STATUS" == "Running" ]]; then
@@ -409,7 +406,7 @@ jobs:
             fi
           else
             echo "❌ Web container not running: $WEB_STATUS"
-            az container logs --resource-group "$RG_NAME" --name "aci-unity-web-${ENV}" || echo "Could not get web logs"
+            az container logs --resource-group "$RG_NAME" --name "aci-unity-catalog-${ENV}" --container-name "web" || echo "Could not get web logs"
           fi
         else
           echo "❌ Could not get web container URL"
