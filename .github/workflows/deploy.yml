@@ -55,6 +55,18 @@ jobs:
           -backend-config="container_name=tfstate" \
           -backend-config="key=terraform.tfstate"
         terraform workspace select ${{ steps.set-env.outputs.environment }} || terraform workspace new ${{ steps.set-env.outputs.environment }}
+        
+        # Import existing resource group if not already in state (fix state drift)
+        echo "Checking if resource group needs to be imported..."
+        ENV="${{ steps.set-env.outputs.environment }}"
+        RG_NAME="${{ env.AZURE_RESOURCE_GROUP }}-${ENV}"
+        if ! terraform state show azurerm_resource_group.main >/dev/null 2>&1; then
+          echo "Importing existing resource group into Terraform state..."
+          terraform import azurerm_resource_group.main "/subscriptions/${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}/resourceGroups/${RG_NAME}" || echo "Import failed or resource group doesn't exist"
+        else
+          echo "Resource group already in Terraform state"
+        fi
+        
         terraform plan -out=tfplan
         terraform apply -auto-approve tfplan
       env:
@@ -232,6 +244,15 @@ jobs:
         
         # Select workspace
         terraform workspace select ${{ needs.deploy-infrastructure.outputs.environment }} || terraform workspace new ${{ needs.deploy-infrastructure.outputs.environment }}
+        
+        # Import existing resource group if not already in state (fix state drift)
+        echo "Checking if resource group needs to be imported..."
+        if ! terraform state show azurerm_resource_group.main >/dev/null 2>&1; then
+          echo "Importing existing resource group into Terraform state..."
+          terraform import azurerm_resource_group.main "/subscriptions/${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}/resourceGroups/${RG_NAME}" || echo "Import failed or resource group doesn't exist"
+        else
+          echo "Resource group already in Terraform state"
+        fi
         
         # Update Terraform variables to use actual images with unique tags to force replacement
         export TF_VAR_web_image="${ACR_NAME}.azurecr.io/unity-catalog-web:${{ github.sha }}"
