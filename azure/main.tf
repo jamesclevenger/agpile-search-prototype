@@ -214,6 +214,30 @@ resource "azurerm_container_group" "main" {
     }
   }
 
+  # Batch Container
+  container {
+    name   = "batch"
+    image  = var.batch_image
+    cpu    = "0.5"
+    memory = "1"
+
+    environment_variables = {
+      MYSQL_HOST               = "localhost"
+      MYSQL_PORT               = "3306"
+      MYSQL_USER               = "unityadmin"
+      MYSQL_DB                 = "unity_catalog"
+      SOLR_HOST                = "localhost"
+      SOLR_PORT                = "8983"
+      SOLR_CORE                = "unity_catalog"
+      DATABRICKS_WORKSPACE_URL = var.databricks_workspace_url
+    }
+
+    secure_environment_variables = {
+      MYSQL_PASSWORD   = var.mysql_admin_password
+      DATABRICKS_TOKEN = var.databricks_token
+    }
+  }
+
   # Registry credentials for Docker Hub and ACR
   image_registry_credential {
     server   = "index.docker.io"
@@ -222,7 +246,7 @@ resource "azurerm_container_group" "main" {
   }
 
   dynamic "image_registry_credential" {
-    for_each = can(regex("\\.azurecr\\.io/", var.web_image)) ? [1] : []
+    for_each = can(regex("\\.azurecr\\.io/", var.web_image)) || can(regex("\\.azurecr\\.io/", var.batch_image)) ? [1] : []
     content {
       server   = azurerm_container_registry.acr.login_server
       username = azurerm_container_registry.acr.admin_username

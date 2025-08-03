@@ -421,4 +421,19 @@ jobs:
         else
           echo "❌ Could not get web container URL"
         fi
+        
+        # Check batch container status
+        echo ""
+        echo "=== BATCH CONTAINER DIAGNOSTICS ==="
+        BATCH_STATUS=$(az container show --resource-group "$RG_NAME" --name "aci-unity-catalog-${ENV}" --query "containers[3].instanceView.currentState.state" -o tsv 2>/dev/null || echo "NotFound")
+        echo "Batch container status: $BATCH_STATUS"
+        
+        if [[ "$BATCH_STATUS" == "Running" ]]; then
+          echo "✅ Batch container is running"
+        else
+          echo "⚠️  Batch container status: $BATCH_STATUS"
+          # Get batch container logs for debugging
+          echo "=== Batch Container Logs ==="
+          az container logs --resource-group "$RG_NAME" --name "aci-unity-catalog-${ENV}" --container-name "batch" || echo "Could not get batch logs"
+        fi
 

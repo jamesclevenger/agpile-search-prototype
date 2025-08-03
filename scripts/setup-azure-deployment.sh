@@ -5,6 +5,35 @@
 
 set -e
 
+# Parse command line arguments
+CONFIG_FILE=""
+SCRIPT_DIR=$(dirname "$0")
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -f|--config)
+      CONFIG_FILE="$2"
+      shift 2
+      ;;
+    -h|--help)
+      echo "Usage: $0 [-f|--config CONFIG_FILE]"
+      echo "  -f, --config CONFIG_FILE  Use configuration file (default: deployment-config.env)"
+      echo "  -h, --help               Show this help message"
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1"
+      echo "Use -h or --help for usage information"
+      exit 1
+      ;;
+  esac
+done
+
+# Auto-detect config file if not specified
+if [[ -z "$CONFIG_FILE" && -f "$SCRIPT_DIR/deployment-config.env" ]]; then
+  CONFIG_FILE="$SCRIPT_DIR/deployment-config.env"
+fi
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -14,6 +43,34 @@ NC='\033[0m' # No Color
 
 echo -e "${BLUE}Unity Catalog Search App - Azure Deployment Setup${NC}"
 echo "============================================================"
+
+# Load configuration file if provided
+if [[ -n "$CONFIG_FILE" ]]; then
+  if [[ -f "$CONFIG_FILE" ]]; then
+    echo -e "${GREEN}Loading configuration from: $CONFIG_FILE${NC}"
+    
+    # Check file permissions for security
+    if [[ "$(stat -c %a "$CONFIG_FILE" 2>/dev/null || stat -f %A "$CONFIG_FILE" 2>/dev/null)" != "600" ]]; then
+      echo -e "${YELLOW}Warning: Config file permissions are not 600. For security, run:${NC}"
+      echo "  chmod 600 $CONFIG_FILE"
+    fi
+    
+    # Source the config file
+    set -a  # Export all variables
+    source "$CONFIG_FILE"
+    set +a  # Stop exporting
+    
+    echo -e "${GREEN}Configuration loaded successfully${NC}"
+  else
+    echo -e "${RED}Error: Configuration file not found: $CONFIG_FILE${NC}"
+    echo "Create the file or run without -f flag for interactive mode"
+    exit 1
+  fi
+else
+  echo -e "${YELLOW}No configuration file found. Using interactive mode.${NC}"
+  echo "Tip: Create scripts/deployment-config.env from the example template for faster setup"
+fi
+echo ""
 
 # Check prerequisites
 echo -e "${YELLOW}Checking prerequisites...${NC}"
@@ -35,43 +92,116 @@ fi
 
 echo -e "${GREEN}✓ Prerequisites check passed${NC}"
 
-# Get user inputs
+# Get user inputs (only prompt for missing values)
 echo ""
-echo -e "${YELLOW}Please provide the following information:${NC}"
+echo -e "${YELLOW}Configuration Review:${NC}"
 
-read -p "Azure Subscription ID: " SUBSCRIPTION_ID
-read -p "Resource Group Name (default: rg-unity-catalog-search): " RESOURCE_GROUP
+# Azure Configuration
+if [[ -z "$SUBSCRIPTION_ID" ]]; then
+  read -p "Azure Subscription ID: " SUBSCRIPTION_ID
+fi
+
+if [[ -z "$RESOURCE_GROUP" ]]; then
+  read -p "Resource Group Name (default: rg-unity-catalog-search): " RESOURCE_GROUP
+fi
 RESOURCE_GROUP=${RESOURCE_GROUP:-rg-unity-catalog-search}
 
-read -p "Azure Region (default: West US 2): " LOCATION
+if [[ -z "$LOCATION" ]]; then
+  read -p "Azure Region (default: West US 2): " LOCATION
+fi
 LOCATION=${LOCATION:-"West US 2"}
 
-read -s -p "MySQL Admin Password: " MYSQL_PASSWORD
-echo ""
+# Database Configuration
+if [[ -z "$MYSQL_PASSWORD" ]]; then
+  read -s -p "MySQL Admin Password: " MYSQL_PASSWORD
+  echo ""
+fi
 
-read -s -p "Databricks Token: " DATABRICKS_TOKEN
-echo ""
+# Databricks Configuration
+if [[ -z "$DATABRICKS_TOKEN" ]]; then
+  read -s -p "Databricks Token: " DATABRICKS_TOKEN
+  echo ""
+fi
 
-read -p "Databricks Workspace URL: " DATABRICKS_WORKSPACE_URL
+if [[ -z "$DATABRICKS_WORKSPACE_URL" ]]; then
+  read -p "Databricks Workspace URL: " DATABRICKS_WORKSPACE_URL
+fi
 
-read -p "Docker Hub Username: " DOCKER_HUB_USERNAME
+# Docker Hub Configuration
+if [[ -z "$DOCKER_HUB_USERNAME" ]]; then
+  read -p "Docker Hub Username: " DOCKER_HUB_USERNAME
+fi
 
-read -s -p "Docker Hub Personal Access Token: " DOCKER_HUB_TOKEN
-echo ""
+if [[ -z "$DOCKER_HUB_TOKEN" ]]; then
+  read -s -p "Docker Hub Personal Access Token: " DOCKER_HUB_TOKEN
+  echo ""
+fi
 
-read -p "Admin Email (for monitoring alerts): " ADMIN_EMAIL
+# Monitoring Configuration
+if [[ -z "$ADMIN_EMAIL" ]]; then
+  read -p "Admin Email (for monitoring alerts): " ADMIN_EMAIL
+fi
 
+# Azure OpenAI Configuration
 echo ""
 echo -e "${YELLOW}Azure OpenAI Configuration (for chat features):${NC}"
-read -s -p "Azure OpenAI API Key: " AZURE_OPENAI_API_KEY
-echo ""
 
-read -p "Azure OpenAI Endpoint (e.g., https://your-resource.openai.azure.com): " AZURE_OPENAI_ENDPOINT
+if [[ -z "$AZURE_OPENAI_API_KEY" ]]; then
+  read -s -p "Azure OpenAI API Key: " AZURE_OPENAI_API_KEY
+  echo ""
+fi
 
-read -p "Azure OpenAI Deployment Name: " AZURE_OPENAI_DEPLOYMENT_NAME
+if [[ -z "$AZURE_OPENAI_ENDPOINT" ]]; then
+  read -p "Azure OpenAI Endpoint (e.g., https://your-resource.openai.azure.com): " AZURE_OPENAI_ENDPOINT
+fi
 
-read -p "Azure OpenAI API Version (default: 2024-02-01): " AZURE_OPENAI_API_VERSION
+if [[ -z "$AZURE_OPENAI_DEPLOYMENT_NAME" ]]; then
+  read -p "Azure OpenAI Deployment Name: " AZURE_OPENAI_DEPLOYMENT_NAME
+fi
+
+if [[ -z "$AZURE_OPENAI_API_VERSION" ]]; then
+  read -p "Azure OpenAI API Version (default: 2024-02-01): " AZURE_OPENAI_API_VERSION
+fi
 AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-"2024-02-01"}
+
+# Validate all required variables are present
+echo ""
+echo -e "${YELLOW}Validating configuration...${NC}"
+
+REQUIRED_VARS=(
+  "SUBSCRIPTION_ID"
+  "RESOURCE_GROUP" 
+  "LOCATION"
+  "MYSQL_PASSWORD"
+  "DATABRICKS_TOKEN"
+  "DATABRICKS_WORKSPACE_URL"
+  "DOCKER_HUB_USERNAME"
+  "DOCKER_HUB_TOKEN"
+  "ADMIN_EMAIL"
+  "AZURE_OPENAI_API_KEY"
+  "AZURE_OPENAI_ENDPOINT"
+  "AZURE_OPENAI_DEPLOYMENT_NAME"
+  "AZURE_OPENAI_API_VERSION"
+)
+
+MISSING_VARS=()
+for var in "${REQUIRED_VARS[@]}"; do
+  if [[ -z "${!var}" ]]; then
+    MISSING_VARS+=("$var")
+  fi
+done
+
+if [[ ${#MISSING_VARS[@]} -gt 0 ]]; then
+  echo -e "${RED}Error: Missing required configuration variables:${NC}"
+  for var in "${MISSING_VARS[@]}"; do
+    echo "  - $var"
+  done
+  echo ""
+  echo "Please provide all required values or update your config file."
+  exit 1
+fi
+
+echo -e "${GREEN}✓ Configuration validation passed${NC}"
 
 # Azure login and setup
 echo ""
@@ -181,21 +311,13 @@ echo -e "${YELLOW}Setting storage account name as GitHub secret...${NC}"
 gh secret set TF_STORAGE_ACCOUNT_NAME --body "$STORAGE_ACCOUNT_NAME"
 gh secret set TF_RESOURCE_GROUP_NAME --body "$RESOURCE_GROUP"
 
-# Create backend configuration
-cat > backend.tf << EOF
-terraform {
-  backend "azurerm" {
-    resource_group_name  = "$RESOURCE_GROUP"
-    storage_account_name = "$STORAGE_ACCOUNT_NAME"
-    container_name       = "tfstate"
-    key                  = "terraform.tfstate"
-  }
-}
-EOF
-
 # Initialize Terraform with new backend
-echo -e "${YELLOW}Initializing Terraform with new backend...${NC}"
-terraform init -force-copy
+echo -e "${YELLOW}Initializing Terraform with runtime backend configuration...${NC}"
+terraform init -reconfigure \
+  -backend-config="resource_group_name=$RESOURCE_GROUP" \
+  -backend-config="storage_account_name=$STORAGE_ACCOUNT_NAME" \
+  -backend-config="container_name=tfstate" \
+  -backend-config="key=terraform.tfstate"
 
 echo ""
 echo -e "${GREEN}🎉 Azure deployment setup completed successfully!${NC}"
@@ -204,6 +326,15 @@ echo -e "${BLUE}Next Steps:${NC}"
 echo "1. Push your changes to GitHub to trigger the deployment workflow"
 echo "2. Monitor the GitHub Actions workflow in your repository"
 echo "3. Once deployed, your application will be available at the Azure Container Instance URL"
+echo ""
+echo -e "${BLUE}Local Development:${NC}"
+echo "To run Terraform locally, use:"
+echo "  cd azure"
+echo "  terraform init -reconfigure \\"
+echo "    -backend-config=\"resource_group_name=$RESOURCE_GROUP\" \\"
+echo "    -backend-config=\"storage_account_name=$STORAGE_ACCOUNT_NAME\" \\"
+echo "    -backend-config=\"container_name=tfstate\" \\"
+echo "    -backend-config=\"key=terraform.tfstate\""
 echo ""
 echo -e "${BLUE}GitHub Secrets Configured:${NC}"
 echo "✓ AZURE_CREDENTIALS"
@@ -223,3 +354,10 @@ echo "✓ TF_RESOURCE_GROUP_NAME"
 echo ""
 echo -e "${YELLOW}Note: ACR authentication is handled automatically via Azure CLI in the workflow.${NC}"
 echo "No additional ACR secrets are required."
+echo ""
+echo -e "${BLUE}Config File Usage:${NC}"
+echo "For faster future deployments, you can use a config file:"
+echo "  cp scripts/deployment-config.env.example scripts/deployment-config.env"
+echo "  # Edit deployment-config.env with your values"
+echo "  chmod 600 scripts/deployment-config.env  # Secure file permissions"
+echo "  ./scripts/setup-azure-deployment.sh      # Will auto-detect config file"

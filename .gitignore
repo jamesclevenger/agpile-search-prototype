@@ -3,3 +3,7 @@ CLAUDE.md
 .claude
 temp
 azure/.terraform
+
+# Deployment configuration files (contain secrets)
+scripts/deployment-config.env
+scripts/*.env
