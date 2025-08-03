@@ -113,23 +113,38 @@ resource "azurerm_storage_share_file" "mysql_init_sql" {
   source           = "${path.module}/../docker/mysql/init.sql"
 }
 
+# Create directory structure for Solr configset
+resource "azurerm_storage_share_directory" "solr_configset_root" {
+  name                 = "unity_catalog_config"
+  storage_share_id     = azurerm_storage_share.solr_configset.id
+}
+
+resource "azurerm_storage_share_directory" "solr_configset_conf" {
+  name                 = "unity_catalog_config/conf"
+  storage_share_id     = azurerm_storage_share.solr_configset.id
+  depends_on          = [azurerm_storage_share_directory.solr_configset_root]
+}
+
 # Upload Solr configset files
 resource "azurerm_storage_share_file" "solr_schema" {
   name             = "unity_catalog_config/conf/schema.xml"
   storage_share_id = azurerm_storage_share.solr_configset.id
   source           = "${path.module}/../docker/solr/configsets/unity_catalog_config/conf/schema.xml"
+  depends_on       = [azurerm_storage_share_directory.solr_configset_conf]
 }
 
 resource "azurerm_storage_share_file" "solr_config" {
   name             = "unity_catalog_config/conf/solrconfig.xml"
   storage_share_id = azurerm_storage_share.solr_configset.id
   source           = "${path.module}/../docker/solr/configsets/unity_catalog_config/conf/solrconfig.xml"
+  depends_on       = [azurerm_storage_share_directory.solr_configset_conf]
 }
 
 resource "azurerm_storage_share_file" "solr_stopwords" {
   name             = "unity_catalog_config/conf/stopwords.txt"
   storage_share_id = azurerm_storage_share.solr_configset.id
   source           = "${path.module}/../docker/solr/configsets/unity_catalog_config/conf/stopwords.txt"
+  depends_on       = [azurerm_storage_share_directory.solr_configset_conf]
 }
 
 # Single Container Group for All Services
