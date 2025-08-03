@@ -18,8 +18,38 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     console.error('Search API error:', error);
+    
+    // Provide more detailed error information
+    let errorMessage = 'Failed to search catalog';
+    let errorDetails = '';
+    
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      errorDetails = error.stack || '';
+    }
+    
+    // Log detailed error information
+    console.error('Search error details:', {
+      message: errorMessage,
+      stack: errorDetails,
+      params: {
+        q: searchParams.get('q'),
+        type: searchParams.get('type'),
+        catalog: searchParams.get('catalog'),
+        schema: searchParams.get('schema'),
+        owner: searchParams.get('owner'),
+        page: searchParams.get('page'),
+        size: searchParams.get('size')
+      },
+      solrUrl: process.env.SOLR_HOST ? `http://${process.env.SOLR_HOST}:${process.env.SOLR_PORT}/solr/${process.env.SOLR_CORE}` : 'undefined'
+    });
+    
     return NextResponse.json(
-      { error: 'Failed to search catalog' },
+      { 
+        error: 'Failed to search catalog',
+        details: errorMessage,
+        timestamp: new Date().toISOString()
+      },
       { status: 500 }
     );
   }

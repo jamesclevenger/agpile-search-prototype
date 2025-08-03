@@ -383,6 +383,12 @@ jobs:
                 # Show the health response for confirmation
                 HEALTH_RESPONSE=$(curl -s "http://${WEB_URL}:3000/api/health" | head -c 200)
                 echo "Health response preview: $HEALTH_RESPONSE"
+                
+                # Test search functionality
+                echo "Testing search API..."
+                SEARCH_TEST=$(curl -s "http://${WEB_URL}:3000/api/search/test" | head -c 300)
+                echo "Search test result: $SEARCH_TEST"
+                
                 break
               else
                 echo "⏳ Health check failed, waiting 60 seconds... (attempt $i/20)"
