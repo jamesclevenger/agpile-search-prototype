@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { solrClient, SearchParams } from '@/lib/solr-client';
 
 export async function GET(request: NextRequest) {
+  // Extract searchParams outside try block so it's available in catch
+  const { searchParams } = new URL(request.url);
+  
   try {
-    const { searchParams } = new URL(request.url);
     const params: SearchParams = {
       q: searchParams.get('q') || '*',
       type: searchParams.get('type') || undefined,
