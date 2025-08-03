@@ -99,11 +99,37 @@ resource "azurerm_storage_share" "mysql_init" {
   quota                = 1
 }
 
+# File Share for Solr configset
+resource "azurerm_storage_share" "solr_configset" {
+  name                 = "solr-configset"
+  storage_account_name = azurerm_storage_account.solr.name
+  quota                = 1
+}
+
 # Upload MySQL initialization script
 resource "azurerm_storage_share_file" "mysql_init_sql" {
   name             = "init.sql"
   storage_share_id = azurerm_storage_share.mysql_init.id
   source           = "${path.module}/../docker/mysql/init.sql"
+}
+
+# Upload Solr configset files
+resource "azurerm_storage_share_file" "solr_schema" {
+  name             = "unity_catalog_config/conf/schema.xml"
+  storage_share_id = azurerm_storage_share.solr_configset.id
+  source           = "${path.module}/../docker/solr/configsets/unity_catalog_config/conf/schema.xml"
+}
+
+resource "azurerm_storage_share_file" "solr_config" {
+  name             = "unity_catalog_config/conf/solrconfig.xml"
+  storage_share_id = azurerm_storage_share.solr_configset.id
+  source           = "${path.module}/../docker/solr/configsets/unity_catalog_config/conf/solrconfig.xml"
+}
+
+resource "azurerm_storage_share_file" "solr_stopwords" {
+  name             = "unity_catalog_config/conf/stopwords.txt"
+  storage_share_id = azurerm_storage_share.solr_configset.id
+  source           = "${path.module}/../docker/solr/configsets/unity_catalog_config/conf/stopwords.txt"
 }
 
 # Single Container Group for All Services
@@ -178,7 +204,15 @@ resource "azurerm_container_group" "main" {
       share_name           = azurerm_storage_share.solr.name
     }
 
-    commands = ["bash", "-c", "echo 'Preparing Solr environment...' && mkdir -p /var/solr/data && chown -R solr:solr /var/solr && echo 'Starting Solr...' && solr-foreground & SOLR_PID=$! && echo 'Waiting for Solr to be ready...' && sleep 45 && echo 'Creating unity_catalog core...' && solr create_core -c unity_catalog && echo 'Adding Unity Catalog fields to schema...' && curl -X POST -H 'Content-type:application/json' --data-binary '{\"add-field\":[{\"name\":\"name\",\"type\":\"text_general\",\"indexed\":true,\"stored\":true},{\"name\":\"full_name\",\"type\":\"string\",\"indexed\":true,\"stored\":true},{\"name\":\"type\",\"type\":\"string\",\"indexed\":true,\"stored\":true},{\"name\":\"catalog_name\",\"type\":\"string\",\"indexed\":true,\"stored\":true},{\"name\":\"schema_name\",\"type\":\"string\",\"indexed\":true,\"stored\":true},{\"name\":\"description\",\"type\":\"text_general\",\"indexed\":true,\"stored\":true},{\"name\":\"owner\",\"type\":\"string\",\"indexed\":true,\"stored\":true}]}' http://localhost:8983/solr/unity_catalog/schema && echo 'Schema updated successfully' && wait $SOLR_PID"]
+    volume {
+      name                 = "solr-configset"
+      mount_path           = "/opt/solr/server/solr/configsets"
+      storage_account_name = azurerm_storage_account.solr.name
+      storage_account_key  = azurerm_storage_account.solr.primary_access_key
+      share_name           = azurerm_storage_share.solr_configset.name
+    }
+
+    commands = ["bash", "-c", "echo 'Preparing Solr environment...' && mkdir -p /var/solr/data && chown -R solr:solr /var/solr && echo 'Creating unity_catalog core with configset...' && solr-precreate unity_catalog /opt/solr/server/solr/configsets/unity_catalog_config && echo 'Starting Solr...' && solr-foreground"]
   }
 
   # Web Container
@@ -255,7 +289,10 @@ resource "azurerm_container_group" "main" {
   }
 
   depends_on = [
-    azurerm_storage_share_file.mysql_init_sql
+    azurerm_storage_share_file.mysql_init_sql,
+    azurerm_storage_share_file.solr_schema,
+    azurerm_storage_share_file.solr_config,
+    azurerm_storage_share_file.solr_stopwords
   ]
 
   tags = {

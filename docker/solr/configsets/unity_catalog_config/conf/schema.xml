@@ -23,7 +23,7 @@
   <field name="_version_" type="long" indexed="true" stored="true"/>
 
   <!-- Unity Catalog Fields -->
-  <field name="name" type="text_general" indexed="true" stored="true" required="true"/>
+  <field name="name" type="string" indexed="true" stored="true" required="true"/>
   <field name="full_name" type="string" indexed="true" stored="true" required="true"/>
   <field name="type" type="string" indexed="true" stored="true" required="true"/>
   <field name="catalog_name" type="string" indexed="true" stored="true"/>
