@@ -16,8 +16,8 @@ WORKDIR /app
 
 ENV NODE_ENV production
 
-# Install cron for scheduling
-RUN apk add --no-cache dcron
+# Install cron for scheduling and netcat for connectivity checks
+RUN apk add --no-cache dcron netcat-openbsd
 
 # Create app user
 RUN addgroup --system --gid 1001 batchuser
@@ -48,60 +48,32 @@ HEALTHCHECK --interval=60s --timeout=30s --start-period=30s --retries=5 \
 RUN cat > /usr/local/bin/start-batch.sh << 'EOF'
 #!/bin/sh
 echo "Starting batch service..."
+echo "Timestamp: $(date)"
 
-# Function to check if a service is available
-check_service() {
-    local host=$1
-    local port=$2
-    local service=$3
-    local max_attempts=30
-    local attempt=1
-    
-    echo "Checking $service connectivity at $host:$port..."
-    while [ $attempt -le $max_attempts ]; do
-        if nc -z "$host" "$port" 2>/dev/null; then
-            echo "$service is available!"
-            return 0
-        fi
-        echo "Attempt $attempt/$max_attempts: $service not ready, waiting 5s..."
-        sleep 5
-        attempt=$((attempt + 1))
-    done
-    echo "WARNING: $service not available after $max_attempts attempts"
-    return 1
-}
-
-# Install netcat for connectivity checks
-apk add --no-cache netcat-openbsd
-
-# Check dependencies
-echo "Checking service dependencies..."
-check_service "${MYSQL_HOST:-localhost}" "${MYSQL_PORT:-3306}" "MySQL"
-check_service "${SOLR_HOST:-localhost}" "${SOLR_PORT:-8983}" "Solr"
-
-# Check if required environment variables are set
-if [ -z "$DATABRICKS_TOKEN" ] || [ -z "$DATABRICKS_WORKSPACE_URL" ]; then
-    echo "WARNING: Databricks credentials not configured"
-    echo "DATABRICKS_TOKEN: ${DATABRICKS_TOKEN:-'not set'}"
-    echo "DATABRICKS_WORKSPACE_URL: ${DATABRICKS_WORKSPACE_URL:-'not set'}"
-    echo "Running in minimal mode - cron daemon only (no indexing jobs will run)"
-else
-    echo "Databricks credentials configured successfully"
+# Check for debug mode
+if [ "$BATCH_DEBUG" = "true" ]; then
+    echo "DEBUG MODE: Starting infinite shell loop for troubleshooting"
+    exec /bin/sh -c 'while true; do sleep 60; done'
 fi
 
 # Create log directory
 mkdir -p /var/log
 
-# Start a background shell for exec access
-{
-    while true; do
-        sleep 3600
-    done
-} &
-echo "Background shell started (PID: $!)"
+# Check if required environment variables are set
+if [ -z "$DATABRICKS_TOKEN" ] || [ -z "$DATABRICKS_WORKSPACE_URL" ]; then
+    echo "WARNING: Databricks credentials not configured"
+    echo "DATABRICKS_TOKEN: ${DATABRICKS_TOKEN:+configured}"
+    echo "DATABRICKS_WORKSPACE_URL: ${DATABRICKS_WORKSPACE_URL:-'not set'}"
+    echo "Running in cron-only mode (no indexing jobs will run)"
+else
+    echo "Databricks credentials configured successfully"
+fi
 
-# Start cron daemon in foreground with logging
-echo "Starting cron daemon..."
+# Log startup completion
+echo "Batch service startup completed at $(date)"
+echo "Starting cron daemon in foreground..."
+
+# Start cron daemon in foreground
 exec crond -f -l 2 -L /var/log/cron.log
 EOF
 
@@ -113,21 +85,36 @@ RUN cat > /usr/local/bin/run-indexing-job.sh << 'EOF'
 echo "Running Unity Catalog indexing job manually..."
 echo "Timestamp: $(date)"
 
-# Check if services are available
-if ! nc -z "${MYSQL_HOST:-localhost}" "${MYSQL_PORT:-3306}"; then
-    echo "ERROR: MySQL not available at ${MYSQL_HOST:-localhost}:${MYSQL_PORT:-3306}"
-    exit 1
-fi
+# Function to check if a service is available
+check_service() {
+    local host=$1
+    local port=$2
+    local service=$3
+    local max_attempts=5
+    local attempt=1
+    
+    echo "Checking $service connectivity at $host:$port..."
+    while [ $attempt -le $max_attempts ]; do
+        if nc -z "$host" "$port" 2>/dev/null; then
+            echo "$service is available!"
+            return 0
+        fi
+        echo "Attempt $attempt/$max_attempts: $service not ready, waiting 3s..."
+        sleep 3
+        attempt=$((attempt + 1))
+    done
+    echo "ERROR: $service not available after $max_attempts attempts"
+    return 1
+}
 
-if ! nc -z "${SOLR_HOST:-localhost}" "${SOLR_PORT:-8983}"; then
-    echo "ERROR: Solr not available at ${SOLR_HOST:-localhost}:${SOLR_PORT:-8983}"
-    exit 1
-fi
+# Check if services are available
+check_service "${MYSQL_HOST:-localhost}" "${MYSQL_PORT:-3306}" "MySQL" || exit 1
+check_service "${SOLR_HOST:-localhost}" "${SOLR_PORT:-8983}" "Solr" || exit 1
 
 # Check credentials
 if [ -z "$DATABRICKS_TOKEN" ] || [ -z "$DATABRICKS_WORKSPACE_URL" ]; then
     echo "ERROR: Databricks credentials not configured"
-    echo "DATABRICKS_TOKEN: ${DATABRICKS_TOKEN:-'not set'}"
+    echo "DATABRICKS_TOKEN: ${DATABRICKS_TOKEN:+configured}"
     echo "DATABRICKS_WORKSPACE_URL: ${DATABRICKS_WORKSPACE_URL:-'not set'}"
     exit 1
 fi

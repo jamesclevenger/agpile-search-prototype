@@ -269,7 +269,7 @@ resource "azurerm_container_group" "main" {
     name   = "batch"
     image  = var.batch_image
     cpu    = "0.5"
-    memory = "1"
+    memory = "1.5"
 
     environment_variables = {
       MYSQL_HOST               = "localhost"
@@ -280,6 +280,7 @@ resource "azurerm_container_group" "main" {
       SOLR_PORT                = "8983"
       SOLR_CORE                = "unity_catalog"
       DATABRICKS_WORKSPACE_URL = var.databricks_workspace_url
+      BATCH_DEBUG              = "true"  # Set to "true" to enable debug mode
     }
 
     secure_environment_variables = {
