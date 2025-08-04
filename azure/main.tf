@@ -155,6 +155,7 @@ resource "azurerm_container_group" "main" {
   ip_address_type     = "Public"
   dns_name_label      = "unity-catalog-${var.environment}"
   os_type             = "Linux"
+  restart_policy      = "Always"
 
   # MySQL Container
   container {
